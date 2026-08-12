@@ -1,8 +1,36 @@
-// Inventory Data (Simulated for dynamic rendering)
-const inventory = {
+// Inventory Data (Linked to Firebase Realtime Database)
+let inventory = {
     cars: [],
     herbs: []
 };
+
+// Listen to Firebase Inventory
+function initInventorySync() {
+    if (typeof rtdb === 'undefined') return;
+
+    rtdb.ref("inventory").on("value", (snapshot) => {
+        inventory.cars = [];
+        inventory.herbs = [];
+
+        snapshot.forEach((child) => {
+            const data = child.val();
+            const product = {
+                category: data.category,
+                brand: data.brand,
+                title: data.title,
+                price: data.price,
+                img: data.imageBase64 || (data.type === 'CAR' ? 'lib/porsche.jpg' : 'lib/herb.jpg'),
+                desc: data.description,
+                specs: data.specs ? data.specs.join(' | ') : ''
+            };
+
+            if (data.type === "CAR") inventory.cars.push(product);
+            else if (data.type === "HERB") inventory.herbs.push(product);
+        });
+
+        renderInventory();
+    });
+}
 
 // Render Inventory to the UI
 function renderInventory() {
@@ -495,17 +523,17 @@ applyFiltersBtn.addEventListener('click', () => {
 const chatWithAgentBtn = document.querySelector('.secondary-action');
 chatWithAgentBtn.addEventListener('click', () => {
     const productName = document.querySelector('#detail-title').textContent;
-    const productImg = document.querySelector('#detail-img').src;
 
     detailOverlay.classList.remove('active');
     document.body.style.overflow = '';
 
-    // Switch to Chat Tab (nav handler also toggles body.chat-open for full-screen)
+    // Switch to Chat Tab
     const chatNavItem = document.querySelector('.nav-item[data-target="chat"]');
     if (chatNavItem) chatNavItem.click();
 
-    // Open specific room
-    openChatRoom(productName);
+    // Send automated inquiry message
+    const msgText = `I am interested in "${productName}". Can you provide more details?`;
+    scSendInquiry(msgText);
 });
 
 // Reserve / Book Now action in the product detail overlay
@@ -513,47 +541,32 @@ const reserveBtn = document.querySelector('#reserve-btn');
 reserveBtn.addEventListener('click', () => {
     const productName = document.querySelector('#detail-title').textContent;
     const price = document.querySelector('#detail-price').textContent;
-    const isService = (document.querySelector('#detail-price').textContent || '').includes('On Request');
 
     // Show confirmation state
     reserveBtn.disabled = true;
-    const original = reserveBtn.innerHTML;
     reserveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Confirming...';
 
     setTimeout(() => {
         reserveBtn.disabled = false;
-        reserveBtn.innerHTML = original;
+        reserveBtn.innerHTML = "Reserve Now";
         detailOverlay.classList.remove('active');
         document.body.style.overflow = '';
 
-        const msg = isService
-            ? `📅 Consultation request received for "${productName}". Our practitioner will contact you shortly to schedule your visit.`
-            : `✅ Reservation request received for "${productName}" (${price}). A member of our team will reach out shortly to finalize.`;
+        // Send reservation as a message to Admin
+        const msgText = `RESERVATION REQUEST: I want to reserve "${productName}" for ${price}.`;
+        scSendInquiry(msgText);
 
-        // Build a small confirmation toast
         const toast = document.createElement('div');
-        toast.className = 'reserve-toast';
+        toast.className = 'reserve-toast show';
         toast.innerHTML = `
             <div class="reserve-toast-icon"><i class="fas fa-check-circle"></i></div>
             <div class="reserve-toast-body">
-                <strong>Request Received!</strong>
-                <p>${msg}</p>
-                <div class="reserve-toast-actions">
-                    <a class="btn-glow small" href="tel:+2348028765972"><i class="fas fa-phone-alt"></i> Call</a>
-                    <a class="btn-glow small secondary" href="https://wa.me/2348028765972"><i class="fab fa-whatsapp"></i> WhatsApp</a>
-                </div>
+                <strong>Request Sent!</strong>
+                <p>Your reservation for "${productName}" has been sent to the Admin.</p>
             </div>
-            <button class="reserve-toast-close"><i class="fas fa-times"></i></button>
         `;
         document.body.appendChild(toast);
-
-        requestAnimationFrame(() => toast.classList.add('show'));
-
-        const dismiss = () => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); };
-        toast.querySelector('.reserve-toast-close').addEventListener('click', dismiss);
-        setTimeout(dismiss, 6000);
-
-        if (window.navigator.vibrate) window.navigator.vibrate([10, 40, 10]);
+        setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 5000);
     }, 900);
 });
 
@@ -627,262 +640,144 @@ detailOverlay.addEventListener('click', (e) => {
 });
 
 /* ============================================================
-   ADEX CONNECT — Brand New Chat / Support Hub Logic
+   ADEX CONNECT — Real-time Chat via Firebase Realtime Database
    ============================================================ */
 const scList = document.querySelector('#sc-list');
 const scRoom = document.querySelector('#sc-room');
-const scConvos = document.querySelectorAll('.sc-convo');
 const scBackBtn = document.querySelector('#sc-back');
 const scSendBtn = document.querySelector('#sc-send');
 const scInput = document.querySelector('#sc-input');
 const scMessages = document.querySelector('#sc-messages');
 const scSearchInput = document.querySelector('#sc-search-input');
-const scPrompts = document.querySelectorAll('.sc-prompt');
-const scEmojiBtn = document.querySelector('#sc-emoji');
 const scTyping = document.querySelector('#sc-typing');
 
-// Thread data keyed by data-thread attribute
-const scThreads = {
-    porsche: {
-        title: 'Porsche 911',
-        img: 'lib/porsche.jpg',
-        messages: [
-            { text: 'Hello! I see you are interested in the Porsche 911. How can I assist you today?', out: false }
-        ]
-    },
-    agbo: {
-        title: 'Agbo Power',
-        img: 'lib/herb.jpg',
-        messages: [
-            { text: 'Hi there! Agbo Power is our high-potency wellness blend. What would you like to know?', out: false }
-        ]
-    },
-    aloe: {
-        title: 'Aloe Vera',
-        img: 'lib/aloe.jpg',
-        messages: [
-            { text: 'Welcome! How can we help with your Aloe Vera order?', out: false }
-        ]
-    },
-    range: {
-        title: 'Range Rover Vogue',
-        img: 'lib/range_rover.jpg',
-        messages: [
-            { text: 'Great choice! The Range Rover Vogue is in high demand. How may we assist?', out: false }
-        ]
-    },
-    consult: {
-        title: 'Home Consultation',
-        img: 'Adewale.jpeg',
-        messages: [
-            { text: 'We have flexible consultation slots this week. When would you like to book?', out: false }
-        ]
-    }
-};
+let chatSessionId = localStorage.getItem('adex_chat_session_v1');
+if (!chatSessionId) {
+    chatSessionId = 'user_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('adex_chat_session_v1', chatSessionId);
+}
 
-let activeThread = 'porsche';
+// Local chat history cache
+const CHAT_HISTORY_KEY = 'adex_chat_history_' + chatSessionId;
+function loadLocalChat() {
+    const raw = localStorage.getItem(CHAT_HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+}
+function saveLocalChat(messages) {
+    localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(messages));
+}
+
+function initChatSync() {
+    if (typeof rtdb === 'undefined') return;
+
+    // Load local history first for instant display
+    const localMsgs = loadLocalChat();
+    if (localMsgs.length > 0) {
+        scMessages.innerHTML = '';
+        localMsgs.forEach(m => scAppend(m.text, m.isSentByUser));
+    }
+
+    rtdb.ref("chats/" + chatSessionId).on("value", (snapshot) => {
+        const data = snapshot.val();
+        if (data && data.messages) {
+            const remoteMsgs = Object.values(data.messages).sort((a,b) => a.time - b.time);
+            scMessages.innerHTML = '';
+            remoteMsgs.forEach(m => scAppend(m.text, m.isSentByUser));
+            saveLocalChat(remoteMsgs); // Update cache
+        } else if (!data) {
+            // Initial message
+            const initialMsg = { text: 'Hello! 👋 Thanks for reaching out. How can I help you today?', isSentByUser: false, time: Date.now() };
+            const newChat = {
+                id: chatSessionId,
+                userName: loadProfile().name,
+                userEmail: loadProfile().email,
+                lastMessage: initialMsg.text,
+                timestamp: Date.now()
+            };
+            rtdb.ref("chats/" + chatSessionId).set(newChat);
+            rtdb.ref("chats/" + chatSessionId + "/messages").push(initialMsg);
+        }
+    });
+}
 
 function scAppend(text, isOut) {
-    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const bubble = document.createElement('div');
     bubble.className = `sc-bubble ${isOut ? 'out' : 'in'}`;
     bubble.innerHTML = `
         <div class="sc-bubble-text">${text}</div>
-        <span class="sc-bubble-meta">${time}</span>
     `;
     scMessages.appendChild(bubble);
     scMessages.scrollTop = scMessages.scrollHeight;
 }
 
-function scOpenRoom(threadKey) {
-    const thread = scThreads[threadKey];
-    if (!thread) return;
-    activeThread = threadKey;
-
-    document.querySelector('#sc-room-title').textContent = thread.title;
-    document.querySelector('#sc-room-img').src = thread.img;
-
-    // Render messages
-    scMessages.innerHTML = '';
-    thread.messages.forEach(m => scAppend(m.text, m.out));
-
-    // Clear unread badge on the active conversation
-    const convoEl = document.querySelector(`.sc-convo[data-thread="${threadKey}"]`);
-    if (convoEl) {
-        const badge = convoEl.querySelector('.sc-unread');
-        if (badge) badge.style.display = 'none';
-    }
-
-    scList.classList.remove('active');
-    scRoom.classList.add('active');
-}
-
-// Open conversation on click
-scConvos.forEach(convo => {
-    convo.addEventListener('click', () => {
-        const thread = convo.getAttribute('data-thread');
-        scOpenRoom(thread);
-        if (window.navigator.vibrate) window.navigator.vibrate(10);
-    });
-});
-
-// Back to list
-scBackBtn.addEventListener('click', () => {
-    scRoom.classList.remove('active');
-    scList.classList.add('active');
-});
-
-// Send message
 function scSend() {
     const text = scInput.value.trim();
-    if (!text) return;
+    if (!text || typeof rtdb === 'undefined') return;
 
-    scThreads[activeThread].messages.push({ text, out: true });
-    scAppend(text, true);
+    const profile = loadProfile();
+    if (profile.name === 'Guest User') {
+        alert("Please set a username in your Profile to start chatting.");
+        document.querySelector('[data-target="profile"]').click();
+        return;
+    }
+
+    const newMsg = { text, isSentByUser: true, time: Date.now() };
+
+    rtdb.ref("chats/" + chatSessionId + "/messages").push(newMsg);
+    rtdb.ref("chats/" + chatSessionId).update({
+        lastMessage: text,
+        timestamp: Date.now(),
+        userName: loadProfile().name,
+        userEmail: loadProfile().email
+    });
+
     scInput.value = '';
-
-    // Show typing, then auto-reply
-    scTyping.style.display = 'flex';
-    scMessages.scrollTop = scMessages.scrollHeight;
-
-    setTimeout(() => {
-        scTyping.style.display = 'none';
-        const reply = scAutoReply(text);
-        scThreads[activeThread].messages.push({ text: reply, out: false });
-        scAppend(reply, false);
-        if (window.navigator.vibrate) window.navigator.vibrate(5);
-    }, 1400);
 }
 
-function scAutoReply(text) {
-    const lower = text.toLowerCase();
-
-    // Greetings
-    if (lower.includes('hello') || lower.includes('hi ') || lower === 'hi' || lower === 'hey' || lower.includes('good morning') || lower.includes('good afternoon')) {
-        return 'Hello! 👋 Thanks for reaching out to AdexMoshow. How can I help you today — are you interested in one of our cars or a Trado-Medical remedy?';
-    }
-
-    // Price / cost
-    if (lower.includes('price') || lower.includes('cost') || lower.includes('how much') || lower.includes('what is the fee') || lower.includes('how many naira')) {
-        return 'We have transparent pricing for all our vehicles and herbal products. Could you tell me the exact item you are interested in so I can share the precise price? I can also help you reserve it today.';
-    }
-
-    // Stock / availability
-    if (lower.includes('stock') || lower.includes('available') || lower.includes('in store') || lower.includes('do you have')) {
-        return 'Great news — that item is currently in stock ✅ and we deliver nationwide within 1-3 business days. Would you like me to place a reservation for you?';
-    }
-
-    // Delivery / shipping
-    if (lower.includes('deliver') || lower.includes('shipping') || lower.includes('ship') || lower.includes('dispatch') || lower.includes('delivery')) {
-        return 'We deliver nationwide across all 36 states in Nigeria. Orders are usually dispatched within 24 hours and arrive within 1-3 business days. Delivery costs depend on your location — may I know your city?';
-    }
-
-    // Consultation / booking
-    if (lower.includes('consult') || lower.includes('book') || lower.includes('appointment') || lower.includes('visit') || lower.includes('schedule')) {
-        return 'I can book a home consultation for you with one of our certified Trado-Medical practitioners. We have slots this week — which day works best for you?';
-    }
-
-    // Warranty / guarantee / trust (car + herb)
-    if (lower.includes('warranty') || lower.includes('guarantee') || lower.includes('genuine') || lower.includes('authentic') || lower.includes('trust') || lower.includes('certified')) {
-        return 'Absolutely — every vehicle we sell comes with verified documentation, and all our herbal products are sourced from trusted native providers under our official CAC registration (Reg. No. 9723919). Quality is guaranteed.';
-    }
-
-    // Financing / payment (cars)
-    if (lower.includes('payment') || lower.includes('installment') || lower.includes('finance') || lower.includes('loan') || lower.includes('pay in')) {
-        return 'We offer flexible payment plans on selected vehicles, including part-payment arrangements. Please let me know which vehicle you are interested in and our team will share the available options.';
-    }
-
-    // Herbal / medical efficacy questions
-    if (lower.includes('herb') || lower.includes('medicine') || lower.includes('cure') || lower.includes('effective') || lower.includes('side effect') || lower.includes('dose') || lower.includes('dosage')) {
-        return 'Our Trado-Medical remedies are prepared from native African herbs and are meant to support wellness. For specific usage, dosage, or any health questions, I recommend speaking directly with our certified practitioner — may I book a brief consultation for you?';
-    }
-
-    // Component/spec questions (cars)
-    if (lower.includes('engine') || lower.includes('horsepower') || lower.includes('spec') || lower.includes('color') || lower.includes('condition') || lower.includes('mileage') || lower.includes('year')) {
-        return 'I can provide full specifications, mileage details, and the condition report for any vehicle in our lot. Which car would you like more details on? I can also arrange a physical inspection.';
-    }
-
-    // Trade-in
-    if (lower.includes('trade') || lower.includes('exchange') || lower.includes('swap') || lower.includes('part exchange')) {
-        return 'Yes, we accept trade-ins! Bring your current vehicle for a free appraisal and we will give you a competitive offer toward any car in our inventory. Would you like to arrange an inspection?';
-    }
-
-    // Contact / talk to human
-    if (lower.includes('agent') || lower.includes('human') || lower.includes('real person') || lower.includes('representative') || lower.includes('call')) {
-        return 'Of course! You can reach our team directly at 📞 +234 802 876 5972 or on WhatsApp at any time. One of our agents will assist you right away.';
-    }
-
-    // Thanks
-    if (lower.includes('thank') || lower.includes('great') || lower.includes('nice') || lower.includes('awesome')) {
-        return "You're very welcome! 😊 Is there anything else I can help you with today?";
-    }
-
-    // Goodbye
-    if (lower.includes('bye') || lower.includes('goodbye') || lower.includes('see you') || lower.includes('later')) {
-        return 'Goodbye! 👋 Thank you for contacting AdexMoshow. Feel free to message us anytime — we are here 24/7.';
-    }
-
-    return "Thanks for your message! 🙏 Our team is reviewing it and will get back to you shortly. For immediate assistance, you can call or WhatsApp us at +234 802 876 5972.";
-}
+// Back to home from chat
+scBackBtn.addEventListener('click', () => {
+    document.querySelector('[data-target="home"]').click();
+});
 
 scSendBtn.addEventListener('click', scSend);
 scInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') scSend();
 });
 
-// Quick prompts
-scPrompts.forEach(prompt => {
-    prompt.addEventListener('click', () => {
-        scInput.value = prompt.getAttribute('data-prompt');
-        scSend();
+function scSendInquiry(text) {
+    if (typeof rtdb === 'undefined') return;
+
+    const profile = loadProfile();
+    if (profile.name === 'Guest User') {
+        alert("Please set a username in your Profile to send inquiries.");
+        document.querySelector('[data-target="profile"]').click();
+        return;
+    }
+
+    const newMsg = { text, isSentByUser: true, time: Date.now() };
+
+    rtdb.ref("chats/" + chatSessionId + "/messages").push(newMsg);
+    rtdb.ref("chats/" + chatSessionId).update({
+        lastMessage: text,
+        timestamp: Date.now(),
+        userName: loadProfile().name,
+        userEmail: loadProfile().email
     });
-});
-
-// Emoji button (simple toggle)
-scEmojiBtn.addEventListener('click', () => {
-    scInput.value += '🙂 ';
-    scInput.focus();
-});
-
-// Search conversations
-scSearchInput.addEventListener('input', () => {
-    const query = scSearchInput.value.trim().toLowerCase();
-    scConvos.forEach(convo => {
-        const haystack = (convo.getAttribute('data-search') || '').toLowerCase();
-        convo.style.display = haystack.includes(query) ? '' : 'none';
-    });
-});
-
-// Compatibility wrapper for "Chat with Agent" buttons that relied on
-// the previous openChatRoom(productName, productImg) signature.
-function openChatRoom(productName) {
-    const name = (productName || '').toLowerCase();
-    let key = 'porsche';
-    if (name.includes('agbo')) key = 'agbo';
-    else if (name.includes('aloe')) key = 'aloe';
-    else if (name.includes('range') || name.includes('rover')) key = 'range';
-    else if (name.includes('consult')) key = 'consult';
-    scOpenRoom(key);
 }
 
 /* ============================================================
-   EDITABLE PROFILE — localStorage-backed (real user, not a bot)
+   EDITABLE PROFILE — Username Only (localStorage-backed)
    ============================================================ */
 const PROFILE_KEY = 'adex_user_profile_v2';
 
-// Clear old demo data from previous versions
-if (localStorage.getItem('adex_user_profile_v1')) {
-    localStorage.removeItem('adex_user_profile_v1');
-}
-
 const defaultProfile = {
     name: 'Guest User',
-    email: 'Sign in to sync your data',
+    email: '',
     phone: '',
     location: '',
     handle: 'guest',
-    avatar: null, // data URL
-    cover: null    // data URL
+    avatar: null,
+    cover: null
 };
 
 function loadProfile() {
@@ -906,24 +801,14 @@ function escHtml(str) {
 function applyProfile() {
     const p = loadProfile();
     const nameEl = document.querySelector('#profile-name');
-    const emailEl = document.querySelector('#profile-email');
-    const phoneEl = document.querySelector('#profile-phone');
-    const locEl = document.querySelector('#profile-location');
     const displayName = document.querySelector('#profile-display-name');
     const displayHandle = document.querySelector('#profile-display-handle');
-    const nameInput = document.querySelector('#profile-name-input');
-    const emailInput = document.querySelector('#profile-email-input');
-    const phoneInput = document.querySelector('#profile-phone-input');
-    const locInput = document.querySelector('#profile-location-input');
     const avatarImg = document.querySelector('#profile-avatar-img');
-    const coverImg = document.querySelector('#profile-cover-img');
+    const loginSection = document.querySelector('#username-login-section');
 
     const isGuest = p.name === 'Guest User';
 
     if (nameEl) nameEl.textContent = p.name;
-    if (emailEl) emailEl.textContent = p.email;
-    if (phoneEl) phoneEl.textContent = p.phone || '—';
-    if (locEl) locEl.textContent = p.location || '—';
 
     if (displayName) {
         displayName.innerHTML = isGuest
@@ -932,158 +817,82 @@ function applyProfile() {
     }
 
     if (displayHandle) {
-        displayHandle.textContent = isGuest ? p.email : '@' + (p.handle || 'user');
+        displayHandle.textContent = isGuest ? 'Set a username to start chatting' : '@' + p.name.toLowerCase().replace(/\s+/g, '');
     }
 
-    if (nameInput) nameInput.value = isGuest ? '' : p.name;
-    if (emailInput) emailInput.value = isGuest ? '' : p.email;
-    if (phoneInput) phoneInput.value = p.phone || '';
-    if (locInput) locInput.value = p.location || '';
+    if (loginSection) {
+        loginSection.style.display = isGuest ? 'block' : 'none';
+    }
 
     if (avatarImg) {
-        if (p.avatar) {
-            avatarImg.src = p.avatar;
-        } else {
-            // Default generic avatar for guest
-            avatarImg.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23cbd5e1'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
-        }
+        avatarImg.src = p.avatar || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23cbd5e1'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
     }
-    if (coverImg && p.cover) coverImg.src = p.cover;
 }
 
-// Edit toggle
-const editToggle = document.querySelector('#profile-edit-toggle');
-const infoView = document.querySelector('#profile-info-view');
-const infoEdit = document.querySelector('#profile-info-edit');
-const saveBtn = document.querySelector('#profile-save-btn');
-const cancelBtn = document.querySelector('#profile-cancel-btn');
+// Username Login Logic
+const setUsernameBtn = document.querySelector('#set-username-btn');
+const usernameInput = document.querySelector('#login-username-input');
 
-if (editToggle) editToggle.addEventListener('click', () => {
-    const p = loadProfile();
-    document.querySelector('#profile-name-input').value = p.name;
-    document.querySelector('#profile-email-input').value = p.email;
-    document.querySelector('#profile-phone-input').value = p.phone;
-    document.querySelector('#profile-location-input').value = p.location;
-    infoView.style.display = 'none';
-    infoEdit.style.display = 'block';
-    editToggle.textContent = 'Cancel';
-    if (window.navigator.vibrate) window.navigator.vibrate(5);
-});
+if (setUsernameBtn) {
+    setUsernameBtn.addEventListener('click', () => {
+        const name = usernameInput.value.trim();
+        if (!name) return alert('Please enter a username');
 
-if (saveBtn) saveBtn.addEventListener('click', () => {
-    const p = loadProfile();
-    p.name = (document.querySelector('#profile-name-input').value || '').trim() || p.name;
-    p.email = (document.querySelector('#profile-email-input').value || '').trim() || p.email;
-    p.phone = (document.querySelector('#profile-phone-input').value || '').trim() || p.phone;
-    p.location = (document.querySelector('#profile-location-input').value || '').trim() || p.location;
-    saveProfile(p);
-    applyProfile();
-    infoEdit.style.display = 'none';
-    infoView.style.display = 'block';
-    editToggle.textContent = 'Edit';
-    if (window.navigator.vibrate) window.navigator.vibrate([10, 50, 10]);
-});
+        const p = loadProfile();
+        p.name = name;
+        saveProfile(p);
+        applyProfile();
 
-if (cancelBtn) cancelBtn.addEventListener('click', () => {
-    infoEdit.style.display = 'none';
-    infoView.style.display = 'block';
-    editToggle.textContent = 'Edit';
-});
+        // Update chat metadata in Firebase if session exists
+        if (typeof rtdb !== 'undefined') {
+            rtdb.ref("chats/" + chatSessionId).update({ userName: name });
+        }
 
-// Avatar & cover upload with localStorage persistence
-function handleImageUpload(inputEl, imgEl, key) {
-    if (!inputEl) return;
-    inputEl.addEventListener('change', (e) => {
+        if (window.navigator.vibrate) window.navigator.vibrate(10);
+    });
+}
+
+// Avatar upload
+const avatarBtn = document.querySelector('#profile-avatar-btn');
+const avatarInput = document.querySelector('#profile-avatar-input');
+const avatarImg = document.querySelector('#profile-avatar-img');
+
+if (avatarBtn) avatarBtn.addEventListener('click', () => avatarInput && avatarInput.click());
+if (avatarInput) {
+    avatarInput.addEventListener('change', (e) => {
         const file = e.target.files && e.target.files[0];
         if (!file) return;
-        if (!file.type.startsWith('image/')) { alert('Please choose an image file.'); return; }
         const reader = new FileReader();
         reader.onload = (ev) => {
             const p = loadProfile();
-            p[key] = ev.target.result;
+            p.avatar = ev.target.result;
             saveProfile(p);
-            if (imgEl) imgEl.src = ev.target.result;
-            if (window.navigator.vibrate) window.navigator.vibrate(10);
+            if (avatarImg) avatarImg.src = ev.target.result;
         };
         reader.readAsDataURL(file);
     });
 }
 
-const avatarBtn = document.querySelector('#profile-avatar-btn');
-const avatarInput = document.querySelector('#profile-avatar-input');
-const coverBtn = document.querySelector('#profile-cover-btn');
-const coverInput = document.querySelector('#profile-cover-input');
-const avatarImg = document.querySelector('#profile-avatar-img');
-const coverImg = document.querySelector('#profile-cover-img');
-
-if (avatarBtn) avatarBtn.addEventListener('click', () => avatarInput && avatarInput.click());
-if (coverBtn) coverBtn.addEventListener('click', () => coverInput && coverInput.click());
-handleImageUpload(avatarInput, avatarImg, 'avatar');
-handleImageUpload(coverInput, coverImg, 'cover');
-
-// Apply saved profile on load (script is deferred, so DOM is ready)
+// Initial calls
 applyProfile();
-renderInventory();
+initInventorySync();
+initChatSync();
 
 /* ============================================================
-   GOOGLE SIGN-IN — Google Identity Services
+   FIREBASE INITIALIZATION
    ============================================================ */
-function handleCredentialResponse(response) {
-    // In a real app, you would send this token to your backend
-    console.log("Encoded JWT ID token: " + response.credential);
-
-    // Decoding the JWT locally for demo purposes (using a simple base64 decode)
-    try {
-        const base64Url = response.credential.split('.')[1];
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        }).join(''));
-
-        const user = JSON.parse(jsonPayload);
-        console.log("User data:", user);
-
-        // Update local profile with Google data
-        const p = loadProfile();
-        p.name = user.name;
-        p.email = user.email;
-        p.avatar = user.picture;
-        p.handle = user.given_name.toLowerCase() + Math.floor(Math.random() * 1000);
-
-        saveProfile(p);
-        applyProfile();
-
-        // Show a success message
-        const toast = document.createElement('div');
-        toast.className = 'reserve-toast show';
-        toast.innerHTML = `
-            <div class="reserve-toast-icon"><i class="fas fa-check-circle"></i></div>
-            <div class="reserve-toast-body">
-                <strong>Welcome, ${user.given_name}!</strong>
-                <p>You have successfully signed in with Google.</p>
-            </div>
-        `;
-        document.body.appendChild(toast);
-        setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 4000);
-
-    } catch (e) {
-        console.error("Error decoding Google credential", e);
-    }
-}
-
-window.onload = function () {
-    if (typeof google !== 'undefined') {
-        google.accounts.id.initialize({
-            client_id: "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com", // REPLACE WITH REAL ID
-            callback: handleCredentialResponse
-        });
-        google.accounts.id.renderButton(
-            document.getElementById("google-signin-btn"),
-            { theme: "outline", size: "large", width: "100%" }
-        );
-        // Optional: Show the One Tap prompt
-        google.accounts.id.prompt();
-    }
+const firebaseConfig = {
+  apiKey: "AIzaSyBcN3Us41kP8Q0r6ftoSZQOoAZvTJHmRzE",
+  authDomain: "adexmosho.firebaseapp.com",
+  projectId: "adexmosho",
+  storageBucket: "adexmosho.firebasestorage.app",
+  messagingSenderId: "249462316956",
+  appId: "1:249462316956:web:61ee1465f7c2eedd9db259",
+  measurementId: "G-PLQL0LL490"
 };
 
-
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const rtdb = firebase.database();
+const auth = firebase.auth();
+const storage = firebase.storage();

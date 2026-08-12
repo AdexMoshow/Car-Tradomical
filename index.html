@@ -332,12 +332,15 @@
                         </div>
                         <div class="profile-name-section">
                             <h2 id="profile-display-name">Guest User</h2>
-                            <p id="profile-display-handle">Sign in to sync your data</p>
+                            <p id="profile-display-handle">Set a username to start chatting</p>
                         </div>
                     </div>
 
-                    <div style="padding: 0 20px 20px;">
-                        <div id="google-signin-btn"></div>
+                    <div id="username-login-section" style="padding: 0 20px 20px;">
+                        <div class="sc-input-wrap" style="margin-bottom: 10px;">
+                            <input type="text" id="login-username-input" placeholder="Enter your username...">
+                        </div>
+                        <button class="btn-glow full" id="set-username-btn">Set Username</button>
                     </div>
 
                     <div class="profile-tabs">
@@ -556,7 +559,14 @@
         </div>
     </div>
 
-    <script defer src="script.js?v=5"></script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script defer src="script.js?v=7"></script>
+    <!-- Removed Google Sign-in script -->
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 </body>
 </html>
