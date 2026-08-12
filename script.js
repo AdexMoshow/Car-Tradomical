@@ -52,8 +52,26 @@ function initInventorySync() {
 function renderInventory() {
     const carGrid = document.querySelector('.car-grid-3');
     const tradoGrid = document.querySelector('.trado-grid-3');
-    if (carGrid) carGrid.innerHTML = inventory.cars.length > 0 ? inventory.cars.map(c => createProductCard(c, 'car')).join('') : '<p class="empty-msg">No cars available.</p>';
-    if (tradoGrid) tradoGrid.innerHTML = inventory.herbs.length > 0 ? inventory.herbs.map(h => createProductCard(h, 'herb')).join('') : '<p class="empty-msg">No herbs available.</p>';
+    
+    try {
+        if (carGrid) {
+            if (inventory.cars && inventory.cars.length > 0) {
+                carGrid.innerHTML = inventory.cars.map(c => createProductCard(c, 'car')).join('');
+            } else {
+                carGrid.innerHTML = '<p class="empty-msg">No cars available.</p>';
+            }
+        }
+        
+        if (tradoGrid) {
+            if (inventory.herbs && inventory.herbs.length > 0) {
+                tradoGrid.innerHTML = inventory.herbs.map(h => createProductCard(h, 'herb')).join('');
+            } else {
+                tradoGrid.innerHTML = '<p class="empty-msg">No herbs available.</p>';
+            }
+        }
+    } catch (error) {
+        console.error('Error rendering inventory:', error);
+    }
 }
 
 function esc(str) {
@@ -299,11 +317,14 @@ function scSendInquiry(text) {
     });
 }
 
+// Chat Room DOM Elements
+const scBackBtn = document.querySelector('#sc-back');
+const scRoom = document.querySelector('#sc-room');
+const scList = document.querySelector('#sc-list');
+
 function openChatRoom() {
-    const list = document.querySelector('#sc-list');
-    const room = document.querySelector('#sc-room');
-    if (list) list.classList.remove('active');
-    if (room) room.classList.add('active');
+    if (scList) scList.classList.remove('active');
+    if (scRoom) scRoom.classList.add('active');
 }
 
 if (scBackBtn) {
@@ -368,21 +389,91 @@ const setUsernameBtn = document.querySelector('#set-username-btn');
 if (setUsernameBtn) {
     setUsernameBtn.addEventListener('click', async () => {
         const input = document.querySelector('#login-username-input');
+        if (!input) {
+            alert('Username input field not found.');
+            return;
+        }
         const name = input.value.trim();
         if (!name) return alert('Please enter a username');
+        
         setUsernameBtn.disabled = true;
         setUsernameBtn.innerHTML = 'Registering...';
+        
         try {
-            const userCred = await auth.signInAnonymously();
-            const uid = userCred.user.uid;
-            await rtdb.ref("users/" + uid).set({ uid, username: name, createdAt: Date.now() });
-            saveProfile({ uid, name });
-            chatSessionId = uid;
-            localStorage.setItem('adex_chat_session_v1', uid);
+            // Use existing chatSessionId or create new anonymous user
+            if (!chatSessionId || chatSessionId.startsWith('user_')) {
+                // Create anonymous auth user
+                const userCred = await auth.signInAnonymously();
+                chatSessionId = userCred.user.uid;
+                localStorage.setItem('adex_chat_session_v1', chatSessionId);
+            }
+            
+            // Save user profile
+            await rtdb.ref("users/" + chatSessionId).set({ 
+                uid: chatSessionId, 
+                username: name, 
+                createdAt: Date.now() 
+            });
+            
+            saveProfile({ uid: chatSessionId, name });
             applyProfile();
             initChatSync();
-        } catch (e) { alert("Registration failed."); }
-        finally { setUsernameBtn.disabled = false; setUsernameBtn.innerHTML = 'Set Username'; }
+            
+            // Clear input and show success
+            input.value = '';
+            alert('Username set successfully!');
+        } catch (e) { 
+            console.error('Registration error:', e);
+            alert('Registration failed: ' + e.message); 
+        }
+        finally { 
+            setUsernameBtn.disabled = false; 
+            setUsernameBtn.innerHTML = 'Set Username'; 
+        }
+    });
+}
+
+/* ============================================================
+   SIGN OUT FUNCTIONALITY
+   ============================================================ */
+const logoutBtn = document.querySelector('.logout-btn');
+if (logoutBtn) {
+    logoutBtn.addEventListener('click', async () => {
+        if (!confirm('Are you sure you want to sign out?')) {
+            return;
+        }
+        
+        try {
+            // Sign out from Firebase
+            await auth.signOut();
+            
+            // Clear local storage
+            localStorage.removeItem(PROFILE_KEY);
+            localStorage.removeItem('adex_chat_history_' + chatSessionId);
+            localStorage.removeItem('adex_active_page');
+            localStorage.removeItem('adex_active_profile_tab');
+            localStorage.removeItem('adex_chat_session_v1');
+            
+            // Reset chat session
+            chatSessionId = 'user_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('adex_chat_session_v1', chatSessionId);
+            
+            // Reset profile to guest
+            saveProfile({ name: 'Guest User' });
+            applyProfile();
+            
+            // Reset inventory
+            inventory = { cars: [], herbs: [] };
+            renderInventory();
+            
+            // Navigate to home page
+            setActivePage('home');
+            
+            alert('You have been signed out successfully.');
+        } catch (e) {
+            console.error('Sign out error:', e);
+            alert('Error signing out: ' + e.message);
+        }
     });
 }
 
