@@ -11,7 +11,7 @@ const firebaseConfig = {
     measurementId: "G-PLQL0LL490"
 };
 
-// Initialize Firebase globally
+// Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 const rtdb = firebase.database();
 const auth = firebase.auth();
@@ -25,7 +25,57 @@ if (!chatSessionId) {
 }
 
 /* ============================================================
-   INVENTORY ENGINE (Syncs adverts for everyone)
+   UTILITIES
+   ============================================================ */
+function esc(str) {
+    if (!str) return "";
+    return str.toString().replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function loadProfile() {
+    const raw = localStorage.getItem('adex_user_profile_v3');
+    return raw ? JSON.parse(raw) : { name: 'Guest User' };
+}
+
+function saveProfile(p) {
+    localStorage.setItem('adex_user_profile_v3', JSON.stringify(p));
+}
+
+/* ============================================================
+   NAVIGATION ENGINE
+   ============================================================ */
+function setActivePage(target, skipHistory = false) {
+    const navItems = document.querySelectorAll('.nav-item');
+    const pages = document.querySelectorAll('.page');
+
+    navItems.forEach(i => i.classList.toggle('active', i.getAttribute('data-target') === target));
+    pages.forEach(p => p.classList.toggle('active', p.id === target));
+
+    // Immersive chat mode
+    document.body.classList.toggle('chat-open', target === 'chat');
+
+    // Support hub panel logic
+    if (target === 'chat') {
+        const list = document.querySelector('#sc-list');
+        const room = document.querySelector('#sc-room');
+        if (list) list.classList.remove('active');
+        if (room) room.classList.add('active');
+    }
+
+    if (!skipHistory) {
+        localStorage.setItem('adex_active_page', target);
+    }
+
+    const content = document.querySelector('#content');
+    if (content) content.scrollTop = 0;
+}
+
+/* ============================================================
+   INVENTORY ENGINE
    ============================================================ */
 function initInventorySync() {
     rtdb.ref("inventory").on("value", (snapshot) => {
@@ -34,13 +84,13 @@ function initInventorySync() {
         snapshot.forEach((child) => {
             const data = child.val();
             const product = {
-                category: data.category,
-                brand: data.brand,
-                title: data.title,
-                price: data.price,
+                category: data.category || "General",
+                brand: data.brand || "",
+                title: data.title || "Untitled",
+                price: data.price || "Contact for Price",
                 img: data.imageBase64 || (data.type === 'CAR' ? 'lib/porsche.jpg' : 'lib/herb.jpg'),
-                desc: data.description,
-                specs: data.specs ? data.specs.join(' | ') : ''
+                desc: data.description || "No description provided.",
+                specs: data.specs ? data.specs.join(' | ') : ""
             };
             if (data.type === "CAR") inventory.cars.push(product);
             else if (data.type === "HERB") inventory.herbs.push(product);
@@ -53,34 +103,16 @@ function renderInventory() {
     const carGrid = document.querySelector('.car-grid-3');
     const tradoGrid = document.querySelector('.trado-grid-3');
     
-    try {
-        if (carGrid) {
-            if (inventory.cars && inventory.cars.length > 0) {
-                carGrid.innerHTML = inventory.cars.map(c => createProductCard(c, 'car')).join('');
-            } else {
-                carGrid.innerHTML = '<p class="empty-msg">No cars available.</p>';
-            }
-        }
-        
-        if (tradoGrid) {
-            if (inventory.herbs && inventory.herbs.length > 0) {
-                tradoGrid.innerHTML = inventory.herbs.map(h => createProductCard(h, 'herb')).join('');
-            } else {
-                tradoGrid.innerHTML = '<p class="empty-msg">No herbs available.</p>';
-            }
-        }
-    } catch (error) {
-        console.error('Error rendering inventory:', error);
+    if (carGrid) {
+        carGrid.innerHTML = inventory.cars.length > 0
+            ? inventory.cars.map(c => createProductCard(c, 'car')).join('')
+            : '<p class="empty-msg">No cars available.</p>';
     }
-}
-
-function esc(str) {
-    if (!str) return "";
-    return str.toString().replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+    if (tradoGrid) {
+        tradoGrid.innerHTML = inventory.herbs.length > 0
+            ? inventory.herbs.map(h => createProductCard(h, 'herb')).join('')
+            : '<p class="empty-msg">No herbs available.</p>';
+    }
 }
 
 function createProductCard(item, type) {
@@ -103,175 +135,47 @@ function createProductCard(item, type) {
 }
 
 /* ============================================================
-   PRODUCT DETAIL OVERLAY
+   CHAT ENGINE
    ============================================================ */
-document.addEventListener('click', (e) => {
-    const product = e.target.closest('.clickable-product');
-    if (!product) return;
+const CHAT_HISTORY_KEY = () => 'adex_chat_history_' + chatSessionId;
+function loadLocalChat() { return JSON.parse(localStorage.getItem(CHAT_HISTORY_KEY()) || '[]'); }
+function saveLocalChat(msgs) { localStorage.setItem(CHAT_HISTORY_KEY(), JSON.stringify(msgs)); }
 
-    const brand = product.getAttribute('data-brand');
-    const title = product.getAttribute('data-title');
-    const price = product.getAttribute('data-price');
-    const img = product.getAttribute('data-img');
-    const desc = product.getAttribute('data-desc');
-    const specs = product.getAttribute('data-specs');
-
-    const overlay = document.querySelector('#product-detail-overlay');
-    if (!overlay) return;
-
-    document.querySelector('#detail-brand').textContent = brand;
-    document.querySelector('#detail-title').textContent = title;
-    document.querySelector('#detail-price').textContent = price;
-    document.querySelector('#detail-img').src = img;
-    document.querySelector('#detail-desc').textContent = desc;
-
-    const specsContainer = document.querySelector('#detail-specs');
-    specsContainer.innerHTML = '';
-    if (specs) {
-        specs.split('|').forEach(spec => {
-            const chip = document.createElement('div');
-            chip.className = 'spec-chip';
-            chip.innerHTML = `<i class="fas fa-info-circle"></i> ${spec.trim()}`;
-            specsContainer.appendChild(chip);
-        });
-    }
-
-    overlay.classList.add('active');
-    document.body.style.overflow = 'hidden';
-});
-
-const closeDetailBtn = document.querySelector('.close-detail');
-if (closeDetailBtn) {
-    closeDetailBtn.addEventListener('click', () => {
-        document.querySelector('#product-detail-overlay').classList.remove('active');
-        document.body.style.overflow = '';
-    });
-}
-
-/* ============================================================
-   NAVIGATION & TABS (With Persistence)
-   ============================================================ */
-const navItems = document.querySelectorAll('.nav-item');
-const pages = document.querySelectorAll('.page');
-
-function setActivePage(target, skipHistory = false) {
-    navItems.forEach(i => {
-        const isTarget = i.getAttribute('data-target') === target;
-        i.classList.toggle('active', isTarget);
-    });
-    pages.forEach(p => {
-        p.classList.toggle('active', p.id === target);
-    });
-
-    // Switch panels automatically when clicking Chat
-    if (target === 'chat') {
-        openChatRoom();
-        document.body.classList.add('chat-open');
-    } else {
-        document.body.classList.remove('chat-open');
-    }
-
-    if (!skipHistory) {
-        localStorage.setItem('adex_active_page', target);
-    }
-
-    const content = document.querySelector('#content');
-    if (content) content.scrollTop = 0;
-}
-
-navItems.forEach(item => {
-    item.addEventListener('click', () => {
-        const target = item.getAttribute('data-target');
-        setActivePage(target);
-        if (window.navigator.vibrate) window.navigator.vibrate(10);
-    });
-});
-
-document.querySelectorAll('.profile-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-        const target = tab.getAttribute('data-tab');
-        document.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        document.querySelectorAll('.tab-content').forEach(c => {
-            const isActive = c.id === `tab-${target}`;
-            c.classList.toggle('active', isActive);
-            if (isActive) localStorage.setItem('adex_active_profile_tab', target);
-        });
-    });
-});
-
-/* ============================================================
-   PULL TO REFRESH ENGINE (Optimized)
-   ============================================================ */
-const contentArea = document.querySelector('#content');
-const pullRefresh = document.querySelector('#pull-to-refresh');
-let touchStart = 0;
-let touchDiff = 0;
-let isRefreshing = false;
-
-if (contentArea && pullRefresh) {
-    contentArea.addEventListener('touchstart', (e) => {
-        if (contentArea.scrollTop <= 0) { touchStart = e.touches[0].clientY; } else { touchStart = 0; }
-    }, { passive: true });
-
-    contentArea.addEventListener('touchmove', (e) => {
-        if (touchStart > 0 && contentArea.scrollTop <= 0) {
-            const currentTouch = e.touches[0].clientY;
-            touchDiff = (currentTouch - touchStart) * 0.5;
-            if (touchDiff > 0) {
-                if (touchDiff > 120) touchDiff = 120 + (touchDiff - 120) * 0.2;
-                pullRefresh.style.transform = `translateY(${touchDiff}px)`;
-                pullRefresh.style.opacity = Math.min(touchDiff / 80, 1);
-            }
-        }
-    }, { passive: true });
-
-    contentArea.addEventListener('touchend', () => {
-        if (touchDiff > 80 && contentArea.scrollTop <= 0) {
-            if (isRefreshing) return;
-            isRefreshing = true;
-            pullRefresh.style.transform = 'translateY(60px)';
-            if (window.navigator.vibrate) window.navigator.vibrate(20);
-            setTimeout(() => { window.location.reload(); }, 500);
-        } else {
-            pullRefresh.style.transform = 'translateY(0)';
-            pullRefresh.style.opacity = '0';
-        }
-        touchStart = 0; touchDiff = 0;
-    });
-}
-
-/* ============================================================
-   CHAT ENGINE (Real-time Messaging & Notifications)
-   ============================================================ */
 function initChatSync() {
-    const scMessages = document.querySelector('#sc-messages');
-    if (!scMessages) return;
+    const msgArea = document.querySelector('#sc-messages');
+    if (!msgArea) return;
 
-    requestNotificationPermission();
+    // Permissions
+    if ("Notification" in window) Notification.requestPermission();
+
+    // Local history first
     const localMsgs = loadLocalChat();
     if (localMsgs.length > 0) {
-        scMessages.innerHTML = '';
+        msgArea.innerHTML = '';
         localMsgs.forEach(m => scAppend(m.text, m.isSentByUser));
     }
 
     rtdb.ref("chats/" + chatSessionId).on("value", (snapshot) => {
         const data = snapshot.val();
-        const msgArea = document.querySelector('#sc-messages');
-        if (data && data.messages && msgArea) {
+        if (data && data.messages) {
             const remoteMsgs = Object.values(data.messages).sort((a,b) => a.time - b.time);
-            if (remoteMsgs.length > 0) {
-                const lastMsg = remoteMsgs[remoteMsgs.length - 1];
-                const localMsgs = loadLocalChat();
-                const lastLocalTime = localMsgs.length > 0 ? localMsgs[localMsgs.length - 1].time : 0;
-                if (!lastMsg.isSentByUser && lastMsg.time > lastLocalTime) {
-                    showWebNotification("Adex Admin", lastMsg.text);
+
+            // New message notification
+            const lastMsg = remoteMsgs[remoteMsgs.length - 1];
+            const localMsgs = loadLocalChat();
+            const lastLocalTime = localMsgs.length > 0 ? localMsgs[localMsgs.length - 1].time : 0;
+            if (!lastMsg.isSentByUser && lastMsg.time > lastLocalTime) {
+                if (Notification.permission === "granted") {
+                    new Notification("Adex Admin", { body: lastMsg.text, icon: 'icon.svg' });
+                    if (window.navigator.vibrate) window.navigator.vibrate([100, 50, 100]);
                 }
             }
+
             msgArea.innerHTML = '';
             remoteMsgs.forEach(m => scAppend(m.text, m.isSentByUser));
             saveLocalChat(remoteMsgs);
         } else if (!data) {
+            // Seed initial message
             const initialMsg = { text: 'Hello! 👋 How can I help you today?', isSentByUser: false, time: Date.now() };
             rtdb.ref("chats/" + chatSessionId).set({ id: chatSessionId, userName: loadProfile().name, timestamp: Date.now() });
             rtdb.ref("chats/" + chatSessionId + "/messages").push(initialMsg);
@@ -289,211 +193,180 @@ function scAppend(text, isOut) {
     el.scrollTop = el.scrollHeight;
 }
 
-function scSend() {
+async function scSend() {
     const input = document.querySelector('#sc-input');
-    if (!input) return;
-    const text = input.value.trim();
+    const text = input ? input.value.trim() : "";
     if (!text) return;
+
     const profile = loadProfile();
     if (profile.name === 'Guest User') {
         alert("Please set a username in your Profile first.");
         setActivePage('profile');
         return;
     }
+
     const newMsg = { text, isSentByUser: true, time: Date.now() };
-    rtdb.ref("chats/" + chatSessionId + "/messages").push(newMsg);
-    rtdb.ref("chats/" + chatSessionId).update({ lastMessage: text, timestamp: Date.now(), userName: profile.name });
+    await rtdb.ref("chats/" + chatSessionId + "/messages").push(newMsg);
+    await rtdb.ref("chats/" + chatSessionId).update({ lastMessage: text, timestamp: Date.now(), userName: profile.name });
     input.value = '';
 }
-
-if (scSendBtn) scSendBtn.addEventListener('click', scSend);
-if (scInput) scInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') scSend(); });
 
 function scSendInquiry(text) {
     const profile = loadProfile();
     const newMsg = { text, isSentByUser: true, time: Date.now() };
-    rtdb.ref("chats/" + chatSessionId + "/messages").push(newMsg).then(() => {
-        rtdb.ref("chats/" + chatSessionId).update({ lastMessage: text, timestamp: Date.now(), userName: profile.name });
+    rtdb.ref("chats/" + chatSessionId + "/messages").push(newMsg);
+    rtdb.ref("chats/" + chatSessionId).update({ lastMessage: text, timestamp: Date.now(), userName: profile.name });
+}
+
+/* ============================================================
+   PWA & INSTALL
+   ============================================================ */
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    document.querySelector('#install-banner')?.classList.add('show');
+});
+
+async function triggerInstall() {
+    if (!deferredPrompt) return alert('Installation not available. Use your browser menu "Add to Home Screen".');
+    deferredPrompt.prompt();
+    deferredPrompt = null;
+    document.querySelector('#install-banner')?.classList.remove('show');
+}
+
+/* ============================================================
+   GLOBAL EVENT LISTENERS
+   ============================================================ */
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Navigation Restorer
+    const savedPage = localStorage.getItem('adex_active_page') || 'home';
+    setActivePage(savedPage, true);
+
+    // 2. Profile Initializer
+    const applyProfile = () => {
+        const p = loadProfile();
+        const isGuest = p.name === 'Guest User';
+        const dispName = document.querySelector('#profile-display-name');
+        const dispHandle = document.querySelector('#profile-display-handle');
+        const loginSec = document.querySelector('#username-login-section');
+        if (dispName) dispName.textContent = p.name;
+        if (dispHandle) dispHandle.textContent = isGuest ? 'Set a username to start chatting' : '@' + p.name.toLowerCase().replace(/\s+/g, '');
+        if (loginSec) loginSec.style.display = isGuest ? 'flex' : 'none';
+    };
+    applyProfile();
+
+    // 3. Set Username Handler
+    const setBtn = document.querySelector('#set-username-btn');
+    if (setBtn) {
+        setBtn.addEventListener('click', async () => {
+            const input = document.querySelector('#login-username-input');
+            const name = input ? input.value.trim() : "";
+            if (!name) return alert('Please enter a username');
+
+            setBtn.disabled = true;
+            setBtn.innerHTML = 'Registering...';
+            try {
+                const userCred = await auth.signInAnonymously();
+                const uid = userCred.user.uid;
+                await rtdb.ref("users/" + uid).set({ uid, username: name, createdAt: Date.now() });
+                saveProfile({ uid, name });
+                chatSessionId = uid;
+                localStorage.setItem('adex_chat_session_v1', uid);
+                applyProfile();
+                initChatSync();
+            } catch (e) { alert("Registration failed."); }
+            finally { setBtn.disabled = false; setBtn.innerHTML = 'Set Username'; }
+        });
+    }
+
+    // 4. Logout Handler
+    document.querySelector('.logout-btn')?.addEventListener('click', async () => {
+        if (!confirm('Sign out?')) return;
+        await auth.signOut();
+        localStorage.clear();
+        window.location.reload();
     });
-}
 
-// Chat Room DOM Elements
-const scBackBtn = document.querySelector('#sc-back');
-const scRoom = document.querySelector('#sc-room');
-const scList = document.querySelector('#sc-list');
+    // 5. PWA Handlers
+    document.querySelector('#install-btn')?.addEventListener('click', triggerInstall);
+    document.querySelector('#profile-install-btn')?.addEventListener('click', triggerInstall);
+    document.querySelector('#install-close')?.addEventListener('click', () => document.querySelector('#install-banner')?.classList.remove('show'));
 
-function openChatRoom() {
-    if (scList) scList.classList.remove('active');
-    if (scRoom) scRoom.classList.add('active');
-}
+    const guideModal = document.querySelector('#install-guide-modal');
+    document.querySelector('#profile-install-guide-btn')?.addEventListener('click', () => guideModal?.classList.add('active'));
+    document.querySelector('#guide-close')?.addEventListener('click', () => guideModal?.classList.remove('active'));
+    document.querySelector('#guide-install-now')?.addEventListener('click', triggerInstall);
 
-if (scBackBtn) {
-    scBackBtn.addEventListener('click', () => {
-        if (scRoom) scRoom.classList.remove('active');
-        if (scList) scList.classList.add('active');
+    // 6. Navigation Tabs
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', () => setActivePage(item.getAttribute('data-target')));
     });
-}
 
-// Global delegated listener for inquiry buttons
-document.addEventListener('click', (e) => {
-    const chatBtn = e.target.closest('.detail-actions .secondary-action');
-    const reserveBtn = e.target.closest('#reserve-btn');
+    document.querySelectorAll('.profile-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const target = tab.getAttribute('data-tab');
+            document.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === `tab-${target}`));
+        });
+    });
 
-    if (chatBtn || reserveBtn) {
-        const profile = loadProfile();
-        if (profile.name === 'Guest User') {
-            alert("Please set a username in your Profile first to identify yourself.");
+    // 7. Product Details
+    document.addEventListener('click', (e) => {
+        const product = e.target.closest('.clickable-product');
+        if (product) {
+            const brand = product.getAttribute('data-brand');
+            const title = product.getAttribute('data-title');
+            const price = product.getAttribute('data-price');
+            const img = product.getAttribute('data-img');
+            const desc = product.getAttribute('data-desc');
+            const specs = product.getAttribute('data-specs');
+
+            const overlay = document.querySelector('#product-detail-overlay');
+            if (overlay) {
+                document.querySelector('#detail-brand').textContent = brand;
+                document.querySelector('#detail-title').textContent = title;
+                document.querySelector('#detail-price').textContent = price;
+                document.querySelector('#detail-img').src = img;
+                document.querySelector('#detail-desc').textContent = desc;
+                const container = document.querySelector('#detail-specs');
+                container.innerHTML = (specs || "").split('|').map(s => `<div class="spec-chip"><i class="fas fa-info-circle"></i> ${s.trim()}</div>`).join('');
+                overlay.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+        }
+
+        // Chat buttons in detail overlay
+        const chatBtn = e.target.closest('.detail-actions .secondary-action');
+        const reserveBtn = e.target.closest('#reserve-btn');
+        if (chatBtn || reserveBtn) {
+            if (loadProfile().name === 'Guest User') {
+                alert("Please set a username first.");
+                document.querySelector('#product-detail-overlay').classList.remove('active');
+                document.body.style.overflow = '';
+                setActivePage('profile');
+                return;
+            }
+            const title = document.querySelector('#detail-title').textContent;
             document.querySelector('#product-detail-overlay').classList.remove('active');
             document.body.style.overflow = '';
-            setActivePage('profile');
-            return;
+            setActivePage('chat');
+            scSendInquiry(chatBtn ? `Interested in "${title}".` : `RESERVATION: I want "${title}".`);
         }
+    });
 
-        const title = document.querySelector('#detail-title').textContent;
-        const price = document.querySelector('#detail-price').textContent;
-
+    document.querySelector('.close-detail')?.addEventListener('click', () => {
         document.querySelector('#product-detail-overlay').classList.remove('active');
         document.body.style.overflow = '';
-        setActivePage('chat');
-        openChatRoom();
+    });
 
-        if (chatBtn) {
-            scSendInquiry(`I am interested in "${title}". Can you provide more details?`);
-        } else {
-            scSendInquiry(`RESERVATION REQUEST: I want to reserve "${title}" for ${price}.`);
-            alert("Request Sent! Your reservation has been sent to the Admin.");
-        }
-    }
+    // Start background syncs
+    initInventorySync();
+    initChatSync();
 });
 
-/* ============================================================
-   PROFILE & AUTH
-   ============================================================ */
-const PROFILE_KEY = 'adex_user_profile_v3';
-function loadProfile() { return JSON.parse(localStorage.getItem(PROFILE_KEY) || '{"name":"Guest User"}'); }
-function saveProfile(p) { localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); }
-
-function applyProfile() {
-    const p = loadProfile();
-    const isGuest = p.name === 'Guest User';
-    const dispName = document.querySelector('#profile-display-name');
-    const dispHandle = document.querySelector('#profile-display-handle');
-    const loginSec = document.querySelector('#username-login-section');
-
-    if (dispName) dispName.textContent = p.name;
-    if (dispHandle) dispHandle.textContent = isGuest ? 'Set a username to start chatting' : '@' + p.name.toLowerCase().replace(/\s+/g, '');
-    if (loginSec) loginSec.style.display = isGuest ? 'flex' : 'none';
+// Service Worker Logic
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js'); });
 }
-
-const setUsernameBtn = document.querySelector('#set-username-btn');
-if (setUsernameBtn) {
-    setUsernameBtn.addEventListener('click', async () => {
-        const input = document.querySelector('#login-username-input');
-        if (!input) {
-            alert('Username input field not found.');
-            return;
-        }
-        const name = input.value.trim();
-        if (!name) return alert('Please enter a username');
-        
-        setUsernameBtn.disabled = true;
-        setUsernameBtn.innerHTML = 'Registering...';
-        
-        try {
-            // Use existing chatSessionId or create new anonymous user
-            if (!chatSessionId || chatSessionId.startsWith('user_')) {
-                // Create anonymous auth user
-                const userCred = await auth.signInAnonymously();
-                chatSessionId = userCred.user.uid;
-                localStorage.setItem('adex_chat_session_v1', chatSessionId);
-            }
-            
-            // Save user profile
-            await rtdb.ref("users/" + chatSessionId).set({ 
-                uid: chatSessionId, 
-                username: name, 
-                createdAt: Date.now() 
-            });
-            
-            saveProfile({ uid: chatSessionId, name });
-            applyProfile();
-            initChatSync();
-            
-            // Clear input and show success
-            input.value = '';
-            alert('Username set successfully!');
-        } catch (e) { 
-            console.error('Registration error:', e);
-            alert('Registration failed: ' + e.message); 
-        }
-        finally { 
-            setUsernameBtn.disabled = false; 
-            setUsernameBtn.innerHTML = 'Set Username'; 
-        }
-    });
-}
-
-/* ============================================================
-   SIGN OUT FUNCTIONALITY
-   ============================================================ */
-const logoutBtn = document.querySelector('.logout-btn');
-if (logoutBtn) {
-    logoutBtn.addEventListener('click', async () => {
-        if (!confirm('Are you sure you want to sign out?')) {
-            return;
-        }
-        
-        try {
-            // Sign out from Firebase
-            await auth.signOut();
-            
-            // Clear local storage
-            localStorage.removeItem(PROFILE_KEY);
-            localStorage.removeItem('adex_chat_history_' + chatSessionId);
-            localStorage.removeItem('adex_active_page');
-            localStorage.removeItem('adex_active_profile_tab');
-            localStorage.removeItem('adex_chat_session_v1');
-            
-            // Reset chat session
-            chatSessionId = 'user_' + Math.random().toString(36).substr(2, 9);
-            localStorage.setItem('adex_chat_session_v1', chatSessionId);
-            
-            // Reset profile to guest
-            saveProfile({ name: 'Guest User' });
-            applyProfile();
-            
-            // Reset inventory
-            inventory = { cars: [], herbs: [] };
-            renderInventory();
-            
-            // Navigate to home page
-            setActivePage('home');
-            
-            alert('You have been signed out successfully.');
-        } catch (e) {
-            console.error('Sign out error:', e);
-            alert('Error signing out: ' + e.message);
-        }
-    });
-}
-
-// PWA Install Logic
-let deferredPrompt = null;
-window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; document.querySelector('#install-banner')?.classList.add('show'); });
-document.querySelector('#install-btn')?.addEventListener('click', () => { if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt = null; } });
-document.querySelector('#install-close')?.addEventListener('click', () => { document.querySelector('#install-banner')?.classList.remove('show'); });
-
-// Initial startup
-document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-        const savedPage = localStorage.getItem('adex_active_page') || 'home';
-        setActivePage(savedPage, true);
-        const savedProfileTab = localStorage.getItem('adex_active_profile_tab');
-        if (savedProfileTab) {
-            document.querySelector(`.profile-tab[data-tab="${savedProfileTab}"]`)?.click();
-        }
-        applyProfile();
-        initInventorySync();
-        initChatSync();
-    }, 50);
-});
