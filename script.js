@@ -76,6 +76,52 @@ function createProductCard(item, type) {
 }
 
 /* ============================================================
+   PRODUCT DETAIL OVERLAY (Restored)
+   ============================================================ */
+document.addEventListener('click', (e) => {
+    const product = e.target.closest('.clickable-product');
+    if (!product) return;
+
+    const brand = product.getAttribute('data-brand');
+    const title = product.getAttribute('data-title');
+    const price = product.getAttribute('data-price');
+    const img = product.getAttribute('data-img');
+    const desc = product.getAttribute('data-desc');
+    const specs = product.getAttribute('data-specs');
+
+    const overlay = document.querySelector('#product-detail-overlay');
+    if (!overlay) return;
+
+    document.querySelector('#detail-brand').textContent = brand;
+    document.querySelector('#detail-title').textContent = title;
+    document.querySelector('#detail-price').textContent = price;
+    document.querySelector('#detail-img').src = img;
+    document.querySelector('#detail-desc').textContent = desc;
+
+    const specsContainer = document.querySelector('#detail-specs');
+    specsContainer.innerHTML = '';
+    if (specs) {
+        specs.split('|').forEach(spec => {
+            const chip = document.createElement('div');
+            chip.className = 'spec-chip';
+            chip.innerHTML = `<i class="fas fa-info-circle"></i> ${spec.trim()}`;
+            specsContainer.appendChild(chip);
+        });
+    }
+
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+});
+
+const closeDetailBtn = document.querySelector('.close-detail');
+if (closeDetailBtn) {
+    closeDetailBtn.addEventListener('click', () => {
+        document.querySelector('#product-detail-overlay').classList.remove('active');
+        document.body.style.overflow = '';
+    });
+}
+
+/* ============================================================
    NAVIGATION & TABS (With Persistence)
    ============================================================ */
 const navItems = document.querySelectorAll('.nav-item');
