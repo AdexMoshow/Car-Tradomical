@@ -56,20 +56,33 @@ function renderInventory() {
     if (tradoGrid) tradoGrid.innerHTML = inventory.herbs.length > 0 ? inventory.herbs.map(h => createProductCard(h, 'herb')).join('') : '<p class="empty-msg">No herbs available.</p>';
 }
 
+function esc(str) {
+    if (!str) return "";
+    return str.toString().replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 function createProductCard(item, type) {
     const isCar = type === 'car';
     return `
         <div class="card ${isCar ? 'car-compact' : 'medical-compact'} clickable-product"
-             data-brand="${item.brand}" data-title="${item.title}" data-price="${item.price}"
-             data-img="${item.img}" data-desc="${item.desc}" data-specs="${item.specs}">
+             data-brand="${esc(item.brand)}"
+             data-title="${esc(item.title)}"
+             data-price="${esc(item.price)}"
+             data-img="${item.img}"
+             data-desc="${esc(item.desc)}"
+             data-specs="${esc(item.specs)}">
             <div class="${isCar ? 'car-img-container' : 'herb-img-container'}">
-                <img loading="lazy" src="${item.img}" alt="${item.title}">
+                <img loading="lazy" src="${item.img}" alt="${esc(item.title)}">
                 ${isCar ? '<div class="heart-btn">❤️</div>' : ''}
             </div>
             <div class="${isCar ? 'car-info-compact' : 'herb-info-compact'}">
-                <span class="${isCar ? 'brand' : 'category'}">${isCar ? item.brand : item.category}</span>
-                <h4>${item.title}</h4>
-                <p class="${isCar ? 'price-sm' : 'rating'}">${isCar ? item.price : '⭐ 5.0'}</p>
+                <span class="${isCar ? 'brand' : 'category'}">${isCar ? esc(item.brand) : esc(item.category)}</span>
+                <h4>${esc(item.title)}</h4>
+                <p class="${isCar ? 'price-sm' : 'rating'}">${isCar ? esc(item.price) : '⭐ 5.0'}</p>
             </div>
         </div>
     `;
