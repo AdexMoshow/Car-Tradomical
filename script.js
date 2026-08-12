@@ -69,12 +69,8 @@ function createProductCard(item, type) {
     const isCar = type === 'car';
     return `
         <div class="card ${isCar ? 'car-compact' : 'medical-compact'} clickable-product"
-             data-brand="${esc(item.brand)}"
-             data-title="${esc(item.title)}"
-             data-price="${esc(item.price)}"
-             data-img="${item.img}"
-             data-desc="${esc(item.desc)}"
-             data-specs="${esc(item.specs)}">
+             data-brand="${esc(item.brand)}" data-title="${esc(item.title)}" data-price="${esc(item.price)}"
+             data-img="${item.img}" data-desc="${esc(item.desc)}" data-specs="${esc(item.specs)}">
             <div class="${isCar ? 'car-img-container' : 'herb-img-container'}">
                 <img loading="lazy" src="${item.img}" alt="${esc(item.title)}">
                 ${isCar ? '<div class="heart-btn">❤️</div>' : ''}
@@ -82,14 +78,14 @@ function createProductCard(item, type) {
             <div class="${isCar ? 'car-info-compact' : 'herb-info-compact'}">
                 <span class="${isCar ? 'brand' : 'category'}">${isCar ? esc(item.brand) : esc(item.category)}</span>
                 <h4>${esc(item.title)}</h4>
-                <p class="${isCar ? 'price-sm' : 'rating'}">${isCar ? esc(item.price) : '⭐ 5.0'}</p>
+                <p class="${isCar ? 'price-sm' : 'rating'}">${isCar ? item.price : '⭐ 5.0'}</p>
             </div>
         </div>
     `;
 }
 
 /* ============================================================
-   PRODUCT DETAIL OVERLAY (Restored)
+   PRODUCT DETAIL OVERLAY
    ============================================================ */
 document.addEventListener('click', (e) => {
     const product = e.target.closest('.clickable-product');
@@ -153,6 +149,9 @@ function setActivePage(target, skipHistory = false) {
     if (!skipHistory) {
         localStorage.setItem('adex_active_page', target);
     }
+
+    const content = document.querySelector('#content');
+    if (content) content.scrollTop = 0;
 }
 
 navItems.forEach(item => {
@@ -185,45 +184,17 @@ let touchStart = 0;
 let touchDiff = 0;
 let isRefreshing = false;
 
-function isContentAtTop() {
-    return contentArea.scrollTop <= 0;
-}
-
-function performRefresh() {
-    if (isRefreshing) return;
-    isRefreshing = true;
-    
-    // Ensure current page is saved before refresh
-    const currentPage = localStorage.getItem('adex_active_page') || 'home';
-    localStorage.setItem('adex_active_page', currentPage);
-    
-    pullRefresh.style.transform = 'translateY(60px)';
-    if (window.navigator.vibrate) window.navigator.vibrate(20);
-    
-    // Use a soft reload that preserves page state
-    setTimeout(() => {
-        window.location.href = window.location.href;
-    }, 500);
-}
-
 if (contentArea && pullRefresh) {
     contentArea.addEventListener('touchstart', (e) => {
-        // Capture initial touch position if at top or content is not scrollable
-        if (isContentAtTop()) {
-            touchStart = e.touches[0].clientY;
-        } else {
-            touchStart = 0;
-        }
+        if (contentArea.scrollTop <= 0) { touchStart = e.touches[0].clientY; } else { touchStart = 0; }
     }, { passive: true });
 
     contentArea.addEventListener('touchmove', (e) => {
-        // Allow pull-to-refresh if at top of content
-        if (touchStart > 0 && isContentAtTop()) {
+        if (touchStart > 0 && contentArea.scrollTop <= 0) {
             const currentTouch = e.touches[0].clientY;
             touchDiff = (currentTouch - touchStart) * 0.5;
-
             if (touchDiff > 0) {
-                if (touchDiff > 120) touchDiff = 120 + (touchDiff - 120) * 0.2; // Resistance
+                if (touchDiff > 120) touchDiff = 120 + (touchDiff - 120) * 0.2;
                 pullRefresh.style.transform = `translateY(${touchDiff}px)`;
                 pullRefresh.style.opacity = Math.min(touchDiff / 80, 1);
             }
@@ -231,29 +202,30 @@ if (contentArea && pullRefresh) {
     }, { passive: true });
 
     contentArea.addEventListener('touchend', () => {
-        // Trigger refresh if pulled far enough and at the top
-        if (touchDiff > 80 && isContentAtTop()) {
-            performRefresh();
+        if (touchDiff > 80 && contentArea.scrollTop <= 0) {
+            if (isRefreshing) return;
+            isRefreshing = true;
+            pullRefresh.style.transform = 'translateY(60px)';
+            if (window.navigator.vibrate) window.navigator.vibrate(20);
+            setTimeout(() => { window.location.reload(); }, 500);
         } else {
-            // Reset pull-to-refresh indicator
             pullRefresh.style.transform = 'translateY(0)';
             pullRefresh.style.opacity = '0';
         }
-        touchStart = 0;
-        touchDiff = 0;
+        touchStart = 0; touchDiff = 0;
     });
-
-    // Also allow refresh on document/body for better mobile support
-    document.addEventListener('touchstart', (e) => {
-        if (contentArea.scrollTop <= 0 && e.target === contentArea) {
-            touchStart = e.touches[0].clientY;
-        }
-    }, { passive: true });
 }
 
 /* ============================================================
    CHAT ENGINE (Real-time Messaging & Notifications)
    ============================================================ */
+const scList = document.querySelector('#sc-list');
+const scRoom = document.querySelector('#sc-room');
+const scBackBtn = document.querySelector('#sc-back');
+const scSendBtn = document.querySelector('#sc-send');
+const scInput = document.querySelector('#sc-input');
+const scMessages = document.querySelector('#sc-messages');
+
 const CHAT_HISTORY_KEY = 'adex_chat_history_' + chatSessionId;
 function loadLocalChat() { return JSON.parse(localStorage.getItem(CHAT_HISTORY_KEY) || '[]'); }
 function saveLocalChat(msgs) { localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(msgs)); }
@@ -272,7 +244,6 @@ function showWebNotification(title, body) {
 function initChatSync() {
     requestNotificationPermission();
     const localMsgs = loadLocalChat();
-    const scMessages = document.querySelector('#sc-messages');
     if (localMsgs.length > 0 && scMessages) {
         scMessages.innerHTML = '';
         localMsgs.forEach(m => scAppend(m.text, m.isSentByUser));
@@ -282,8 +253,6 @@ function initChatSync() {
         const data = snapshot.val();
         if (data && data.messages && scMessages) {
             const remoteMsgs = Object.values(data.messages).sort((a,b) => a.time - b.time);
-
-            // Notification Detection
             if (remoteMsgs.length > 0) {
                 const lastMsg = remoteMsgs[remoteMsgs.length - 1];
                 const lastLocalTime = localMsgs.length > 0 ? localMsgs[localMsgs.length - 1].time : 0;
@@ -291,7 +260,6 @@ function initChatSync() {
                     showWebNotification("Adex Admin", lastMsg.text);
                 }
             }
-
             scMessages.innerHTML = '';
             remoteMsgs.forEach(m => scAppend(m.text, m.isSentByUser));
             saveLocalChat(remoteMsgs);
@@ -304,32 +272,83 @@ function initChatSync() {
 }
 
 function scAppend(text, isOut) {
-    const el = document.querySelector('#sc-messages');
-    if (!el) return;
+    if (!scMessages) return;
     const bubble = document.createElement('div');
     bubble.className = `sc-bubble ${isOut ? 'out' : 'in'}`;
     bubble.innerHTML = `<div class="sc-bubble-text">${text}</div>`;
-    el.appendChild(bubble);
-    el.scrollTop = el.scrollHeight;
+    scMessages.appendChild(bubble);
+    scMessages.scrollTop = scMessages.scrollHeight;
 }
 
 function scSend() {
-    const input = document.querySelector('#sc-input');
-    const text = input.value.trim();
+    const text = scInput.value.trim();
     if (!text) return;
-    if (loadProfile().name === 'Guest User') {
+    const profile = loadProfile();
+    if (profile.name === 'Guest User') {
         alert("Please set a username in your Profile first.");
-        document.querySelector('[data-target="profile"]').click();
+        setActivePage('profile');
         return;
     }
     const newMsg = { text, isSentByUser: true, time: Date.now() };
     rtdb.ref("chats/" + chatSessionId + "/messages").push(newMsg);
-    rtdb.ref("chats/" + chatSessionId).update({ lastMessage: text, timestamp: Date.now(), userName: loadProfile().name });
-    input.value = '';
+    rtdb.ref("chats/" + chatSessionId).update({ lastMessage: text, timestamp: Date.now(), userName: profile.name });
+    scInput.value = '';
 }
 
-const scSendBtn = document.querySelector('#sc-send');
 if (scSendBtn) scSendBtn.addEventListener('click', scSend);
+if (scInput) scInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') scSend(); });
+
+function scSendInquiry(text) {
+    const profile = loadProfile();
+    const newMsg = { text, isSentByUser: true, time: Date.now() };
+    rtdb.ref("chats/" + chatSessionId + "/messages").push(newMsg).then(() => {
+        rtdb.ref("chats/" + chatSessionId).update({ lastMessage: text, timestamp: Date.now(), userName: profile.name });
+    });
+}
+
+function openChatRoom() {
+    if (scList) scList.classList.remove('active');
+    if (scRoom) scRoom.classList.add('active');
+}
+
+if (scBackBtn) {
+    scBackBtn.addEventListener('click', () => {
+        if (scRoom) scRoom.classList.remove('active');
+        if (scList) scList.classList.add('active');
+    });
+}
+
+// Global delegated listener for inquiry buttons
+document.addEventListener('click', (e) => {
+    const chatBtn = e.target.closest('.detail-actions .secondary-action');
+    const reserveBtn = e.target.closest('#reserve-btn');
+
+    if (chatBtn || reserveBtn) {
+        const profile = loadProfile();
+        if (profile.name === 'Guest User') {
+            alert("Please set a username in your Profile first to identify yourself.");
+            document.querySelector('#product-detail-overlay').classList.remove('active');
+            document.body.style.overflow = '';
+            setActivePage('profile');
+            return;
+        }
+
+        const title = document.querySelector('#detail-title').textContent;
+        const price = document.querySelector('#detail-price').textContent;
+
+        document.querySelector('#product-detail-overlay').classList.remove('active');
+        document.body.style.overflow = '';
+        setActivePage('chat');
+        openChatRoom();
+
+        if (chatBtn) {
+            scSendInquiry(`I am interested in "${title}". Can you provide more details?`);
+        } else {
+            scSendInquiry(`RESERVATION REQUEST: I want to reserve "${title}" for ${price}.`);
+            alert("Request Sent! Your reservation has been sent to the Admin.");
+        }
+    }
+});
 
 /* ============================================================
    PROFILE & AUTH
@@ -372,171 +391,23 @@ if (setUsernameBtn) {
     });
 }
 
-// Service Worker Logic
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js');
-    });
-}
-
-/* ============================================================
-   PWA INSTALL HANDLING
-   ============================================================ */
+// PWA Install Logic
 let deferredPrompt = null;
-const installBanner = document.querySelector('#install-banner');
-const installBtn = document.querySelector('#install-btn');
-const installClose = document.querySelector('#install-close');
-const profileInstallBtn = document.querySelector('#profile-install-btn');
-const profileInstallGuideBtn = document.querySelector('#profile-install-guide-btn');
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; document.querySelector('#install-banner')?.classList.add('show'); });
+document.querySelector('#install-btn')?.addEventListener('click', () => { if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt = null; } });
+document.querySelector('#install-close')?.addEventListener('click', () => { document.querySelector('#install-banner')?.classList.remove('show'); });
 
-// Capture the beforeinstallprompt event
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    if (installBanner) installBanner.classList.add('show');
-});
-
-// Hide banner when app is installed
-window.addEventListener('appinstalled', () => {
-    if (installBanner) installBanner.classList.remove('show');
-    deferredPrompt = null;
-});
-
-// Install button in banner
-if (installBtn) {
-    installBtn.addEventListener('click', async () => {
-        if (!deferredPrompt) {
-            alert('AdexMoshow is already installed or not available for your device.');
-            return;
-        }
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        if (outcome === 'accepted') {
-            if (installBanner) installBanner.classList.remove('show');
-        }
-        deferredPrompt = null;
-    });
-}
-
-// Close banner button
-if (installClose) {
-    installClose.addEventListener('click', () => {
-        if (installBanner) installBanner.classList.remove('show');
-        localStorage.setItem('adex_install_banner_dismissed', 'true');
-    });
-}
-
-// Profile install button
-if (profileInstallBtn) {
-    profileInstallBtn.addEventListener('click', async () => {
-        if (!deferredPrompt) {
-            alert('AdexMoshow is already installed or not available for your device. See the "How to Install" guide below.');
-            return;
-        }
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        if (outcome === 'accepted') {
-            alert('AdexMoshow has been installed! Find it on your home screen.');
-            if (installBanner) installBanner.classList.remove('show');
-        }
-        deferredPrompt = null;
-    });
-}
-
-/* ============================================================
-   INSTALL GUIDE MODAL
-   ============================================================ */
-const guideModal = document.querySelector('#install-guide-modal');
-const guideCloseBtn = document.querySelector('#guide-close');
-const guideInstallNowBtn = document.querySelector('#guide-install-now');
-
-if (profileInstallGuideBtn) {
-    profileInstallGuideBtn.addEventListener('click', () => {
-        if (guideModal) guideModal.classList.add('active');
-    });
-}
-
-if (guideCloseBtn) {
-    guideCloseBtn.addEventListener('click', () => {
-        if (guideModal) guideModal.classList.remove('active');
-    });
-}
-
-if (guideInstallNowBtn) {
-    guideInstallNowBtn.addEventListener('click', async () => {
-        if (deferredPrompt) {
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            if (outcome === 'accepted') {
-                alert('AdexMoshow has been installed! Find it on your home screen.');
-                if (guideModal) guideModal.classList.remove('active');
-                if (installBanner) installBanner.classList.remove('show');
-            }
-            deferredPrompt = null;
-        } else {
-            alert('Please follow the platform-specific instructions shown above.');
-        }
-    });
-}
-
-// Close guide modal when clicking outside
-if (guideModal) {
-    guideModal.addEventListener('click', (e) => {
-        if (e.target === guideModal) {
-            guideModal.classList.remove('active');
-        }
-    });
-}
-
-/* ============================================================
-   CHAT WITH AGENT BUTTON (Product Detail)
-   ============================================================ */
-document.addEventListener('click', (e) => {
-    const chatWithAgentBtn = e.target.closest('.detail-actions .secondary-action');
-    if (!chatWithAgentBtn) return;
-    
-    // Navigate to chat page
-    const chatNav = document.querySelector('[data-target="chat"]');
-    if (chatNav) {
-        chatNav.click();
-    } else {
-        setActivePage('chat');
-    }
-    
-    // Close the product overlay
-    const overlay = document.querySelector('#product-detail-overlay');
-    if (overlay) {
-        overlay.classList.remove('active');
-        document.body.style.overflow = '';
-    }
-    
-    // Focus on chat input
-    setTimeout(() => {
-        const chatInput = document.querySelector('#sc-input');
-        if (chatInput) chatInput.focus();
-    }, 100);
-});
-
-// Global initialization
+// Initial startup
 document.addEventListener('DOMContentLoaded', () => {
-    // Restore previous page state with a small delay to ensure DOM is ready
     setTimeout(() => {
         const savedPage = localStorage.getItem('adex_active_page') || 'home';
         setActivePage(savedPage, true);
-
         const savedProfileTab = localStorage.getItem('adex_active_profile_tab');
         if (savedProfileTab) {
-            const tabEl = document.querySelector(`.profile-tab[data-tab="${savedProfileTab}"]`);
-            if (tabEl) tabEl.click();
+            document.querySelector(`.profile-tab[data-tab="${savedProfileTab}"]`)?.click();
         }
-
         applyProfile();
         initInventorySync();
         initChatSync();
-        
-        // Scroll to top after page restoration
-        setTimeout(() => {
-            if (contentArea) contentArea.scrollTop = 0;
-        }, 100);
     }, 50);
 });
