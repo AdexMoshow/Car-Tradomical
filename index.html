@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
+    <title>AdexMoshow Car & TradoMedic</title>
+    <link rel="icon" type="image/svg+xml" href="icon.svg">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="./site.webmanifest">
+<meta name="theme-color" content="#2563eb">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="AdexMoshow">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <!-- iOS PWA support -->
+    <link rel="apple-touch-icon" href="icon.svg">
+    <link rel="apple-touch-icon" sizes="180x180" href="icon.svg">
+    <link rel="apple-touch-startup-image" href="Adewale.jpeg">
+    <!-- Critical inline CSS (above-the-fold) -->
+    <style>
+    /* Critical styles inlined to prevent render-blocking */
+    :root{--primary:#2563eb;--bg-light:#f1f5f9;--text-main:#0f172a}
+    html,body{background:var(--bg-light);color:var(--text-main);margin:0;height:100%;font-family:system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    header{position:fixed;top:15px;left:50%;transform:translateX(-50%);padding:10px 20px;border-radius:30px;background:rgba(255,255,255,0.7)}
+    .logo{font-weight:800;color:var(--text-main)}
+    #content{padding:80px 20px 80px;min-height:100vh}
+    .floating-card{border-radius:20px;padding:20px;background:#fff}
+    </style>
+
+    <!-- Preload main startup image -->
+    <link rel="preload" as="image" href="Adewale.jpeg">
+</head>
+<body>
+    <div id="app">
+        <!-- PWA Install Banner -->
+        <div id="install-banner" class="install-banner">
+            <div class="install-content">
+                <img src="icon.svg" alt="App Icon" class="install-icon">
+                <div class="install-text">
+                    <strong>Install AdexMoshow</strong>
+                </div>
+            </div>
+            <div class="install-actions">
+                <button id="install-btn" class="btn-glow small">Get App</button>
+                <button id="install-close" class="btn-close"><i class="fas fa-times"></i></button>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">Adex<span>Moshow</span> <span style="font-size: 0.8rem; font-weight: 400; color: var(--text-dim); margin-left: 5px;">Car & TradoMedic</span></div>
+            <div class="glow-effect"></div>
+        </header>
+
+        <main id="content">
+            <!-- Pull to Refresh Indicator -->
+            <div id="pull-to-refresh" class="pull-refresh-container">
+                <i class="fas fa-sync-alt fa-spin"></i>
+            </div>
+            <!-- Home Page -->
+            <section id="home" class="page active">
+                <div class="startup-section">
+                    <div class="startup-tabs">
+                        <button class="startup-tab active" data-target="startup-details">Details</button>
+                        <button class="startup-tab" data-target="startup-advantages">Advantages</button>
+                        <button class="startup-tab" data-target="startup-trust">Trust</button>
+                    </div>
+                    <div class="startup-panels">
+                        <div id="startup-details" class="startup-panel active">
+                            <div class="startup-card">
+                                <div class="adewale-scene">
+                                    <div class="adewale-lights">
+                                        <span class="light-orb light-orb-1"></span>
+                                        <span class="light-orb light-orb-2"></span>
+                                        <span class="light-orb light-orb-3"></span>
+                                    </div>
+                                    <div class="adewale-image-wrapper">
+                                        <img src="Adewale.jpeg" alt="Adewale" class="adewale-img">
+                                    </div>
+                                </div>
+                                <div class="startup-copy">
+                                    <h3>Welcome to AdexMoshow</h3>
+                                    <p>Experience holistic wellness and premium services in one immersive PWA experience. Our platform is designed to provide you with a seamless and modern interface for all your needs.</p>
+                                </div>
+                                <div class="cac-cert-image-wrap">
+                                    <img src="cac-certificate.png" alt="CAC Certificate of Registration - AdexMoshow Tradomedical Ventures" class="cac-cert-image" loading="lazy">
+                                    <div class="cac-cert-image-caption">
+                                        <i class="fas fa-certificate"></i> Official CAC Certificate of Registration — Reg. No. 9723919
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="startup-advantages" class="startup-panel">
+                            <div class="startup-card">
+                                <h3>Advantages</h3>
+                                <p>Our platform offers a curated selection of services and seamless contact support. Every section is designed to feel premium, modern, and easy to navigate.</p>
+                                <ul class="startup-list">
+                                    <li>Unified service marketplace</li>
+                                    <li>Animated startup tabs with moving lights</li>
+                                    <li>Fast mobile-first PWA interactions</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div id="startup-trust" class="startup-panel">
+                            <div class="startup-card">
+                                <h3>Trust</h3>
+                                <p>AdexMoshow is built to earn confidence with transparent information and direct communication channels. The experience emphasizes quality assurance for all our offerings.</p>
+                                <ul class="startup-list">
+                                    <li>24/7 support and contact options</li>
+                                    <li>Verified descriptions and quality service</li>
+                                    <li>Official government registration and accountability</li>
+                                </ul>
+                            </div>
+
+                            <!-- CAC Certificate Card -->
+                            <div class="cac-certificate-card">
+                                <div class="cac-cert-header">
+                                    <div class="cac-shield"><i class="fas fa-certificate"></i></div>
+                                    <div>
+                                        <span class="cac-badge">Official &amp; Verified</span>
+                                        <h3>CAC Certificate of Registration</h3>
+                                    </div>
+                                </div>
+                                <p class="cac-cert-body">
+                                    <strong>ADEXMOSHOW TRADOMEDICAL VENTURES</strong> is a fully registered business name under the
+                                    <strong>Corporate Affairs Commission (CAC)</strong> of the Federal Republic of Nigeria,
+                                    in line with the <strong>Companies and Allied Matters Act 2020</strong>.
+                                </p>
+                                <ul class="cac-cert-list">
+                                    <li><span>Registration No.</span> <strong>9723919</strong></li>
+                                    <li><span>Nature of Business</span> <strong>Traditional Medicine</strong></li>
+                                    <li><span>Registered Address</span> <strong>32, Soji Oshodi Street, Pedro Road, Shomolu, Lagos State, Nigeria</strong></li>
+                                </ul>
+                                <div class="cac-cert-statement">
+                                    <i class="fas fa-quote-left"></i>
+                                    <p>This certificate confirms that AdexMoshow TradoMedical Ventures operates as a
+                                    legitimate and lawfully registered enterprise. Every herbal remedy we offer is backed
+                                    by this official government registration, giving you full confidence in the authenticity,
+                                    integrity, and accountability of our traditional medicine practice.</p>
+                                </div>
+                                <a class="btn-glow cac-view-btn" href="CERTIFICATE - ADEXMOSHOW TRADOMEDICAL VENTURES.pdf" target="_blank" rel="noopener">
+                                    <i class="fas fa-file-pdf"></i> View Certificate
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="home-info-section">
+                    <div class="info-card">
+                        <div class="card-icon-box blue">
+                            <i class="fas fa-history"></i>
+                        </div>
+                        <h3>Our Legacy</h3>
+                        <p>AdexMoshow started with a unique vision: to bridge the gap between modern transportation and ancient wellness. For over a decade, we have provided premium automobiles while preserving the potency of traditional herbal medicine.</p>
+                    </div>
+
+                    <div class="info-card herb-bg-card">
+                        <div class="card-overlay"></div>
+                        <div class="card-content">
+                            <h3>Native Heritage</h3>
+                            <p>Our "Trado-medical" wing is rooted in deep ancestral knowledge. We source raw, organic native herbs from the heart of Africa, processed with care to maintain their natural healing properties for your holistic well-being.</p>
+                        </div>
+                    </div>
+
+                    <div class="info-card">
+                        <div class="card-icon-box green">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <h3>Quality Assurance</h3>
+                        <p>Whether it's a high-performance engine or a life-restoring herbal blend, quality is our non-negotiable standard. Every car undergoes a 200-point inspection, and every herb is verified for purity.</p>
+                    </div>
+                </div>
+
+                <div class="contact-preview">
+                    <h3>Need Assistance?</h3>
+                    <p>Our experts are available 24/7 for consultations.</p>
+                    <p class="address-line"><i class="fas fa-map-marker-alt"></i>
+                        <a href="https://www.google.com/maps/search/?api=1&query=32+Soji-Oshodi+street+shomolu+Lagos" target="_blank" rel="noopener">32 Soji-Oshodi street, Shomolu, Lagos</a>
+                    </p>
+
+                    <div class="map-embed">
+                        <iframe
+                            src="https://www.google.com/maps?q=32+Soji-Oshodi+street+shomolu+Lagos&output=embed"
+                            loading="lazy"
+                            referrerpolicy="no-referrer-when-downgrade"
+                            aria-hidden="false"
+                            title="AdexMoshow Location">
+                        </iframe>
+                    </div>
+
+                    <div class="hero-btns">
+                        <button class="btn-glow outline small" onclick="window.location.href='tel:+2348028765972'"><i class="fas fa-phone-alt"></i> Call</button>
+                        <button class="btn-glow secondary small" onclick="window.location.href='https://wa.me/2348028765972'"><i class="fab fa-whatsapp"></i> WhatsApp</button>
+                        <button class="btn-glow outline small" onclick="window.open('https://www.google.com/maps/search/?api=1&query=32+Soji-Oshodi+street+shomolu+Lagos','_blank')"><i class="fas fa-map-marker-alt"></i> View on Map</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Car Lot Page -->
+            <section id="carlot" class="page">
+                <div class="page-header-flex">
+                    <h2 class="section-title">Exclusive Inventory</h2>
+                    <div class="filter-icon"><i class="fas fa-sliders-h"></i></div>
+                </div>
+
+                <!-- Filter Categories -->
+                <div class="categories-scroll">
+                    <div class="category-chip active">All</div>
+                    <div class="category-chip">Luxury</div>
+                    <div class="category-chip">SUV</div>
+                    <div class="category-chip">Sports</div>
+                    <div class="category-chip">Electric</div>
+                </div>
+
+                <div class="car-grid-3">
+                </div>
+            </section>
+
+<!-- Chat Page - "Adex Connect" Support Hub (Brand New Design) -->
+            <section id="chat" class="page">
+                <!-- Support Center (List View) -->
+                <div id="sc-list" class="sc-panel active">
+                    <div class="sc-topbar">
+                        <div class="sc-exit" onclick="document.querySelector('[data-target=\'home\']').click()"><i class="fas fa-times"></i></div>
+                        <div class="sc-title-block">
+                            <span class="sc-eyebrow">Adex Connect</span>
+                            <h2 class="sc-title">Support Hub</h2>
+                        </div>
+                        <div class="sc-avatar-mini"><i class="fas fa-headset"></i></div>
+                    </div>
+
+                    <div class="sc-hero">
+                        <div class="sc-hero-icon"><i class="fas fa-comments"></i></div>
+                        <div>
+                            <h3>We're here to help</h3>
+                            <p>Replies within minutes, 24/7.</p>
+                        </div>
+                    </div>
+
+                    <div class="sc-searchbox">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="sc-search-input" placeholder="Search your conversations...">
+                    </div>
+
+                    <div class="sc-convo-list" id="sc-convo-list">
+                        <!-- Removed conversation cards to keep page clean -->
+                    </div>
+                </div>
+
+                <!-- Live Chat Room (Detail View) -->
+                <div id="sc-room" class="sc-panel">
+                    <div class="sc-room-top">
+                        <button class="sc-room-back" id="sc-back"><i class="fas fa-arrow-left"></i></button>
+                        <div class="sc-room-agent">
+                            <div class="sc-room-avatar">
+                                <img id="sc-room-img" src="Adewale.jpeg" alt="Agent">
+                                <span class="sc-live-dot"></span>
+                            </div>
+                            <div class="sc-room-id">
+                                <h3 id="sc-room-title">Adex Support</h3>
+                                <span class="sc-live-badge"><i class="fas fa-circle"></i> Live Support</span>
+                            </div>
+                        </div>
+                        <div class="sc-room-actions">
+                            <a href="tel:+2348028765972"><i class="fas fa-phone-alt"></i></a>
+                            <a href="https://wa.me/2348028765972"><i class="fab fa-whatsapp"></i></a>
+                        </div>
+                    </div>
+
+                    <div class="sc-msg-area" id="sc-messages">
+                        <!-- Messages injected here -->
+                        <div class="sc-typing" id="sc-typing" style="display:none;">
+                            <span></span><span></span><span></span>
+                        </div>
+                    </div>
+
+                    <div class="sc-prompts" id="sc-prompts">
+                        <!-- Removed prompts to keep page clean -->
+                    </div>
+
+                    <div class="sc-composer">
+                        <button class="sc-attach"><i class="fas fa-plus"></i></button>
+                        <div class="sc-input-wrap">
+                            <input type="text" id="sc-input" placeholder="Write a message...">
+                        </div>
+                        <button class="sc-emoji" id="sc-emoji"><i class="fas fa-smile"></i></button>
+                        <button class="sc-send" id="sc-send"><i class="fas fa-paper-plane"></i></button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Trado-medical Page -->
+            <section id="trado" class="page">
+                <div class="page-header-flex">
+                    <h2 class="section-title">Natural Healing</h2>
+                    <div class="filter-icon"><i class="fas fa-mortar-pestle"></i></div>
+                </div>
+
+                <!-- Herb Filter Categories -->
+                <div class="categories-scroll herb-categories">
+                    <div class="category-chip herb-filter active" data-herb-cat="All">All</div>
+                    <div class="category-chip herb-filter" data-herb-cat="Internal">Internal</div>
+                    <div class="category-chip herb-filter" data-herb-cat="Detox">Detox</div>
+                    <div class="category-chip herb-filter" data-herb-cat="Skin">Skin</div>
+                    <div class="category-chip herb-filter" data-herb-cat="Bones">Bones</div>
+                    <div class="category-chip herb-filter" data-herb-cat="Immunity">Immunity</div>
+                    <div class="category-chip herb-filter" data-herb-cat="General">General</div>
+                </div>
+
+                <div class="trado-grid-3">
+                </div>
+            </section>
+
+            <!-- Profile Page -->
+            <section id="profile" class="page">
+                <div class="profile-container">
+<!-- Profile Cover -->
+                    <div class="profile-cover">
+                        <img id="profile-cover-img" loading="lazy" src="lib/cover.jpg" alt="Cover">
+                        <input type="file" id="profile-cover-input" accept="image/*" hidden>
+                        <button class="edit-cover-btn" id="profile-cover-btn"><i class="fas fa-camera"></i></button>
+                    </div>
+
+                    <div class="profile-header-main">
+                        <div class="profile-avatar-wrapper">
+                            <div class="profile-avatar">
+                                <img id="profile-avatar-img" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23cbd5e1'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" alt="User">
+                            </div>
+                            <div class="online-indicator"></div>
+                            <input type="file" id="profile-avatar-input" accept="image/*" hidden>
+                            <button class="edit-avatar-btn" id="profile-avatar-btn"><i class="fas fa-pen"></i></button>
+                        </div>
+                        <div class="profile-name-section">
+                            <h2 id="profile-display-name">Guest User</h2>
+                            <p id="profile-display-handle">Sign in to sync your data</p>
+                        </div>
+                    </div>
+
+                    <div style="padding: 0 20px 20px;">
+                        <div id="google-signin-btn"></div>
+                    </div>
+
+                    <div class="profile-tabs">
+                        <div class="profile-tab active" data-tab="details">Details</div>
+                        <div class="profile-tab" data-tab="activity">Activity</div>
+                        <div class="profile-tab" data-tab="settings">Settings</div>
+                    </div>
+
+                    <!-- Details Tab Content -->
+                    <div id="tab-details" class="tab-content active">
+                        <div class="detail-group">
+                            <h3>Account Information</h3>
+                            <p style="color: var(--text-dim); margin-top: 10px;">Please sign in to view your profile details.</p>
+                        </div>
+                    </div>
+
+                    <!-- Activity Tab Content (Hidden by default) -->
+                    <div id="tab-activity" class="tab-content">
+                        <div class="detail-group">
+                            <h3>Recent Activity</h3>
+                            <ul class="activity-list">
+                                <!-- Removed activity items to keep page clean -->
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Settings Tab Content (Hidden by default) -->
+                    <div id="tab-settings" class="tab-content">
+<div class="detail-group">
+                            <h3>App Preferences</h3>
+                            <div id="profile-install-row" class="setting-item">
+                                <span>Install Web App</span>
+                                <button id="profile-install-btn" class="btn-glow small" style="width: auto; padding: 5px 15px;">Install</button>
+                            </div>
+                            <div class="setting-item">
+                                <span>How to Install</span>
+                                <button id="profile-install-guide-btn" class="btn-glow outline small" style="width: auto; padding: 5px 15px;">Guide</button>
+                            </div>
+                            <div class="setting-item">
+                                <span>Push Notifications</span>
+                                <label class="switch">
+                                    <input type="checkbox" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <span>Dark Mode</span>
+                                <label class="switch">
+                                    <input type="checkbox">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn-glow logout-btn">
+                        <i class="fas fa-sign-out-alt"></i> Sign Out
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <nav class="bottom-nav">
+            <div class="nav-item active" data-target="home">
+                <i class="fas fa-home"></i>
+                <span>Home</span>
+            </div>
+            <div class="nav-item" data-target="carlot">
+                <i class="fas fa-car"></i>
+                <span>Car Lot</span>
+            </div>
+            <div class="nav-item" data-target="chat">
+                <i class="fas fa-comment-dots"></i>
+                <span>Chat</span>
+            </div>
+            <div class="nav-item" data-target="trado">
+                <i class="fas fa-heartbeat"></i>
+                <span>Trado</span>
+            </div>
+<div class="nav-item" data-target="profile">
+                <i class="fas fa-user"></i>
+                <span>Profile</span>
+            </div>
+            <div class="nav-indicator"></div>
+        </nav>
+    </div>
+
+    <!-- Advanced Filter Drawer -->
+    <div id="filter-drawer" class="drawer-overlay">
+        <div class="drawer-content">
+            <div class="drawer-header">
+                <h3>Advanced Filters</h3>
+                <button class="close-drawer"><i class="fas fa-times"></i></button>
+            </div>
+
+            <div class="drawer-body">
+                <div class="filter-group">
+                    <label>Sort By</label>
+                    <div class="filter-options">
+                        <button class="option-btn active">Recommended</button>
+                        <button class="option-btn">Newest First</button>
+                        <button class="option-btn">Price: Low to High</button>
+                        <button class="option-btn">Price: High to Low</button>
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <label>Price Range (Naira)</label>
+                    <div class="price-inputs">
+                        <input type="number" placeholder="Min" id="price-min">
+                        <span>-</span>
+                        <input type="number" placeholder="Max" id="price-max">
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <label>Transmission</label>
+                    <div class="chip-group">
+                        <div class="chip-select">Automatic</div>
+                        <div class="chip-select">Manual</div>
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <label>Fuel Type</label>
+                    <div class="chip-group">
+                        <div class="chip-select">Petrol</div>
+                        <div class="chip-select">Diesel</div>
+                        <div class="chip-select">Electric</div>
+                        <div class="chip-select">Hybrid</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="drawer-footer">
+                <button class="btn-glow outline" id="reset-filters">Reset All</button>
+                <button class="btn-glow" id="apply-filters">Apply Filters</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Product Detail Overlay -->
+    <div id="product-detail-overlay" class="detail-overlay">
+        <div class="detail-container">
+            <button class="close-detail"><i class="fas fa-times"></i></button>
+            <div class="detail-img-box">
+                <img id="detail-img" src="" alt="Product">
+            </div>
+            <div class="detail-content">
+                <div class="detail-header-row">
+                    <div>
+                        <span id="detail-brand" class="brand-tag">Brand</span>
+                        <h2 id="detail-title">Product Name</h2>
+                    </div>
+                    <div id="detail-price" class="price-tag">₦0.00</div>
+                </div>
+                <div class="detail-specs-row" id="detail-specs">
+                    <!-- Specs will be injected here -->
+                </div>
+                <div class="detail-description">
+                    <h3>About this product</h3>
+                    <p id="detail-desc">Full description goes here.</p>
+                </div>
+                <div class="detail-actions">
+                    <button class="btn-glow primary-action" id="reserve-btn">Reserve Now</button>
+                    <button class="btn-glow outline secondary-action">Chat with Agent</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<!-- Install Guide Modal -->
+    <div id="install-guide-modal" class="guide-overlay">
+        <div class="guide-modal">
+            <div class="guide-header">
+                <h3><i class="fas fa-download"></i> Install AdexMoshow</h3>
+                <button class="guide-close" id="guide-close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="guide-body">
+                <p class="guide-intro">Install AdexMoshow on your device to get a full-screen, app-like experience with offline support.</p>
+
+                <div class="guide-platform">
+                    <div class="toog">
+                        <i class="fab fa-android"></i>
+                        <span>Android</span>
+                    </div>
+                    <ol class="guide-steps">
+                        <li>Open this site in <strong>Chrome</strong>.</li>
+                        <li>Tap the <strong>⋮ (three-dot) menu</strong> at the top-right.</li>
+                        <li>Tap <strong>"Add to Home screen"</strong>.</li>
+                        <li>Tap <strong>"Add"</strong> — the AdexMoshow app icon will appear on your home screen.</li>
+                    </ol>
+                </div>
+
+                <div class="guide-platform">
+                    <div class="toog">
+                        <i class="fab fa-apple"></i>
+                        <span>iPhone / iPad (iOS)</span>
+                    </div>
+                    <ol class="guide-steps">
+                        <li>Open this site in <strong>Safari</strong>.</li>
+                        <li>Tap the <strong>Share button</strong> <i class="fas fa-square-arrow-up"></i> at the bottom.</li>
+                        <li>Scroll and tap <strong>"Add to Home Screen"</strong>.</li>
+                        <li>Tap <strong>"Add"</strong> — the AdexMoshow app icon will appear on your home screen.</li>
+                    </ol>
+                </div>
+
+                <div class="guide-note">
+                    <i class="fas fa-info-circle"></i>
+                    Once added, launch AdexMoshow from your home screen like any other app. It works offline and opens in full screen.
+                </div>
+            </div>
+            <div class="guide-footer">
+                <button class="btn-glow" id="guide-install-now">Install Now</button>
+            </div>
+        </div>
+    </div>
+
+    <script defer src="script.js?v=5"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</body>
+</html>
