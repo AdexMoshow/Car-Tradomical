@@ -379,6 +379,144 @@ if ('serviceWorker' in navigator) {
     });
 }
 
+/* ============================================================
+   PWA INSTALL HANDLING
+   ============================================================ */
+let deferredPrompt = null;
+const installBanner = document.querySelector('#install-banner');
+const installBtn = document.querySelector('#install-btn');
+const installClose = document.querySelector('#install-close');
+const profileInstallBtn = document.querySelector('#profile-install-btn');
+const profileInstallGuideBtn = document.querySelector('#profile-install-guide-btn');
+
+// Capture the beforeinstallprompt event
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    if (installBanner) installBanner.classList.add('show');
+});
+
+// Hide banner when app is installed
+window.addEventListener('appinstalled', () => {
+    if (installBanner) installBanner.classList.remove('show');
+    deferredPrompt = null;
+});
+
+// Install button in banner
+if (installBtn) {
+    installBtn.addEventListener('click', async () => {
+        if (!deferredPrompt) {
+            alert('AdexMoshow is already installed or not available for your device.');
+            return;
+        }
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+            if (installBanner) installBanner.classList.remove('show');
+        }
+        deferredPrompt = null;
+    });
+}
+
+// Close banner button
+if (installClose) {
+    installClose.addEventListener('click', () => {
+        if (installBanner) installBanner.classList.remove('show');
+        localStorage.setItem('adex_install_banner_dismissed', 'true');
+    });
+}
+
+// Profile install button
+if (profileInstallBtn) {
+    profileInstallBtn.addEventListener('click', async () => {
+        if (!deferredPrompt) {
+            alert('AdexMoshow is already installed or not available for your device. See the "How to Install" guide below.');
+            return;
+        }
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+            alert('AdexMoshow has been installed! Find it on your home screen.');
+            if (installBanner) installBanner.classList.remove('show');
+        }
+        deferredPrompt = null;
+    });
+}
+
+/* ============================================================
+   INSTALL GUIDE MODAL
+   ============================================================ */
+const guideModal = document.querySelector('#install-guide-modal');
+const guideCloseBtn = document.querySelector('#guide-close');
+const guideInstallNowBtn = document.querySelector('#guide-install-now');
+
+if (profileInstallGuideBtn) {
+    profileInstallGuideBtn.addEventListener('click', () => {
+        if (guideModal) guideModal.classList.add('active');
+    });
+}
+
+if (guideCloseBtn) {
+    guideCloseBtn.addEventListener('click', () => {
+        if (guideModal) guideModal.classList.remove('active');
+    });
+}
+
+if (guideInstallNowBtn) {
+    guideInstallNowBtn.addEventListener('click', async () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                alert('AdexMoshow has been installed! Find it on your home screen.');
+                if (guideModal) guideModal.classList.remove('active');
+                if (installBanner) installBanner.classList.remove('show');
+            }
+            deferredPrompt = null;
+        } else {
+            alert('Please follow the platform-specific instructions shown above.');
+        }
+    });
+}
+
+// Close guide modal when clicking outside
+if (guideModal) {
+    guideModal.addEventListener('click', (e) => {
+        if (e.target === guideModal) {
+            guideModal.classList.remove('active');
+        }
+    });
+}
+
+/* ============================================================
+   CHAT WITH AGENT BUTTON (Product Detail)
+   ============================================================ */
+document.addEventListener('click', (e) => {
+    const chatWithAgentBtn = e.target.closest('.detail-actions .secondary-action');
+    if (!chatWithAgentBtn) return;
+    
+    // Navigate to chat page
+    const chatNav = document.querySelector('[data-target="chat"]');
+    if (chatNav) {
+        chatNav.click();
+    } else {
+        setActivePage('chat');
+    }
+    
+    // Close the product overlay
+    const overlay = document.querySelector('#product-detail-overlay');
+    if (overlay) {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+    
+    // Focus on chat input
+    setTimeout(() => {
+        const chatInput = document.querySelector('#sc-input');
+        if (chatInput) chatInput.focus();
+    }, 100);
+});
+
 // Global initialization
 document.addEventListener('DOMContentLoaded', () => {
     // Restore previous page state with a small delay to ensure DOM is ready
