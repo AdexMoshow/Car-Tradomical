@@ -4,11 +4,9 @@ let inventory = {
     herbs: []
 };
 
-// Listen to Firebase Inventory
 function initInventorySync() {
-    if (typeof rtdb === 'undefined') return;
-
-    rtdb.ref("inventory").on("value", (snapshot) => {
+    // Inventory should load immediately for everyone
+    firebase.database().ref("inventory").on("value", (snapshot) => {
         inventory.cars = [];
         inventory.herbs = [];
 
@@ -667,8 +665,17 @@ function saveLocalChat(messages) {
     localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(messages));
 }
 
+// Browser Notification Permission
+function requestNotificationPermission() {
+    if ("Notification" in window) {
+        Notification.requestPermission();
+    }
+}
+
 function initChatSync() {
     if (typeof rtdb === 'undefined') return;
+
+    requestNotificationPermission();
 
     // Load local history first for instant display
     const localMsgs = loadLocalChat();
@@ -681,6 +688,18 @@ function initChatSync() {
         const data = snapshot.val();
         if (data && data.messages) {
             const remoteMsgs = Object.values(data.messages).sort((a,b) => a.time - b.time);
+
+            // Notification Engine: Detect if the newest message is from Admin
+            if (remoteMsgs.length > 0) {
+                const lastMsg = remoteMsgs[remoteMsgs.length - 1];
+                const localMsgs = loadLocalChat();
+                const lastLocalTime = localMsgs.length > 0 ? localMsgs[localMsgs.length - 1].time : 0;
+
+                if (!lastMsg.isSentByUser && lastMsg.time > lastLocalTime) {
+                    showWebNotification("Adex Admin", lastMsg.text);
+                }
+            }
+
             scMessages.innerHTML = '';
             remoteMsgs.forEach(m => scAppend(m.text, m.isSentByUser));
             saveLocalChat(remoteMsgs); // Update cache
@@ -708,6 +727,16 @@ function scAppend(text, isOut) {
     `;
     scMessages.appendChild(bubble);
     scMessages.scrollTop = scMessages.scrollHeight;
+}
+
+function showWebNotification(title, body) {
+    if (Notification.permission === "granted") {
+        const n = new Notification(title, {
+            body: body,
+            icon: 'icon.svg'
+        });
+        if (window.navigator.vibrate) window.navigator.vibrate([100, 50, 100]);
+    }
 }
 
 function scSend() {
@@ -766,18 +795,14 @@ function scSendInquiry(text) {
 }
 
 /* ============================================================
-   EDITABLE PROFILE — Username Only (localStorage-backed)
+   EDITABLE PROFILE — Anonymous Auth & Username (Firebase RTDB)
    ============================================================ */
-const PROFILE_KEY = 'adex_user_profile_v2';
+const PROFILE_KEY = 'adex_user_profile_v3';
 
 const defaultProfile = {
+    uid: null,
     name: 'Guest User',
-    email: '',
-    phone: '',
-    location: '',
-    handle: 'guest',
-    avatar: null,
-    cover: null
+    avatar: null
 };
 
 function loadProfile() {
@@ -821,7 +846,7 @@ function applyProfile() {
     }
 
     if (loginSection) {
-        loginSection.style.display = isGuest ? 'block' : 'none';
+        loginSection.style.display = isGuest ? 'flex' : 'none';
     }
 
     if (avatarImg) {
@@ -829,26 +854,51 @@ function applyProfile() {
     }
 }
 
-// Username Login Logic
+// Anonymous Sign-in & Username Registration
 const setUsernameBtn = document.querySelector('#set-username-btn');
 const usernameInput = document.querySelector('#login-username-input');
 
 if (setUsernameBtn) {
-    setUsernameBtn.addEventListener('click', () => {
+    setUsernameBtn.addEventListener('click', async () => {
         const name = usernameInput.value.trim();
         if (!name) return alert('Please enter a username');
 
-        const p = loadProfile();
-        p.name = name;
-        saveProfile(p);
-        applyProfile();
+        setUsernameBtn.disabled = true;
+        setUsernameBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registering...';
 
-        // Update chat metadata in Firebase if session exists
-        if (typeof rtdb !== 'undefined') {
-            rtdb.ref("chats/" + chatSessionId).update({ userName: name });
+        try {
+            // 1. Sign in Anonymously
+            const userCred = await auth.signInAnonymously();
+            const uid = userCred.user.uid;
+
+            // 2. Register Username in RTDB
+            await rtdb.ref("users/" + uid).set({
+                uid: uid,
+                username: name,
+                createdAt: Date.now()
+            });
+
+            // 3. Update local profile
+            const p = loadProfile();
+            p.uid = uid;
+            p.name = name;
+            saveProfile(p);
+
+            // 4. Update chat session ID to use the permanent UID
+            chatSessionId = uid;
+            localStorage.setItem('adex_chat_session_v1', uid);
+
+            applyProfile();
+            initChatSync(); // Re-sync chat with the new permanent UID
+
+            if (window.navigator.vibrate) window.navigator.vibrate(10);
+        } catch (error) {
+            console.error("Auth error", error);
+            alert("Failed to register. Please check your internet connection.");
+        } finally {
+            setUsernameBtn.disabled = false;
+            setUsernameBtn.innerHTML = 'Set Username';
         }
-
-        if (window.navigator.vibrate) window.navigator.vibrate(10);
     });
 }
 
@@ -874,13 +924,6 @@ if (avatarInput) {
 }
 
 // Initial calls
-applyProfile();
-initInventorySync();
-initChatSync();
-
-/* ============================================================
-   FIREBASE INITIALIZATION
-   ============================================================ */
 const firebaseConfig = {
   apiKey: "AIzaSyBcN3Us41kP8Q0r6ftoSZQOoAZvTJHmRzE",
   authDomain: "adexmosho.firebaseapp.com",
@@ -896,3 +939,7 @@ firebase.initializeApp(firebaseConfig);
 const rtdb = firebase.database();
 const auth = firebase.auth();
 const storage = firebase.storage();
+
+applyProfile();
+initInventorySync();
+initChatSync();
