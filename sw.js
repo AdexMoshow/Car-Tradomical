@@ -53,10 +53,15 @@ self.addEventListener('fetch', event => {
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req).then(networkRes => {
-        const copy = networkRes.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put('index.html', copy));
+        if (networkRes && networkRes.status === 200) {
+          const copy = networkRes.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(req.url, copy));
+        }
         return networkRes;
-      }).catch(() => caches.match('index.html'))
+      }).catch(() => {
+        // Fallback to cached index.html on offline
+        return caches.match(req).then(cached => cached || caches.match('index.html'));
+      })
     );
     return;
   }
@@ -65,7 +70,13 @@ self.addEventListener('fetch', event => {
   if (req.destination === 'image' || url.pathname.startsWith('/lib/')) {
     event.respondWith(
       caches.match(req).then(cached => cached || fetch(req).then(networkRes => {
-        return caches.open(CACHE_NAME).then(cache => { cache.put(req, networkRes.clone()); return networkRes; });
+        if (networkRes && networkRes.status === 200) {
+          return caches.open(CACHE_NAME).then(cache => { 
+            cache.put(req, networkRes.clone()); 
+            return networkRes; 
+          });
+        }
+        return networkRes;
       }).catch(() => {
         // Return a small transparent placeholder if offline
         return new Response('', { status: 404 });

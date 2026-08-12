@@ -124,10 +124,33 @@ const contentArea = document.querySelector('#content');
 const pullRefresh = document.querySelector('#pull-to-refresh');
 let touchStart = 0;
 let touchDiff = 0;
+let isRefreshing = false;
+
+function isContentAtTop() {
+    return contentArea.scrollTop <= 0;
+}
+
+function performRefresh() {
+    if (isRefreshing) return;
+    isRefreshing = true;
+    
+    // Ensure current page is saved before refresh
+    const currentPage = localStorage.getItem('adex_active_page') || 'home';
+    localStorage.setItem('adex_active_page', currentPage);
+    
+    pullRefresh.style.transform = 'translateY(60px)';
+    if (window.navigator.vibrate) window.navigator.vibrate(20);
+    
+    // Use a soft reload that preserves page state
+    setTimeout(() => {
+        window.location.href = window.location.href;
+    }, 500);
+}
 
 if (contentArea && pullRefresh) {
     contentArea.addEventListener('touchstart', (e) => {
-        if (contentArea.scrollTop <= 0) {
+        // Capture initial touch position if at top or content is not scrollable
+        if (isContentAtTop()) {
             touchStart = e.touches[0].clientY;
         } else {
             touchStart = 0;
@@ -135,7 +158,8 @@ if (contentArea && pullRefresh) {
     }, { passive: true });
 
     contentArea.addEventListener('touchmove', (e) => {
-        if (touchStart > 0 && contentArea.scrollTop <= 0) {
+        // Allow pull-to-refresh if at top of content
+        if (touchStart > 0 && isContentAtTop()) {
             const currentTouch = e.touches[0].clientY;
             touchDiff = (currentTouch - touchStart) * 0.5;
 
@@ -148,21 +172,24 @@ if (contentArea && pullRefresh) {
     }, { passive: true });
 
     contentArea.addEventListener('touchend', () => {
-        if (touchDiff > 80 && contentArea.scrollTop <= 0) {
-            pullRefresh.style.transform = 'translateY(60px)';
-            if (window.navigator.vibrate) window.navigator.vibrate(20);
-
-            // STAY AT SAME PAGE: Handled by Persistence logic
-            setTimeout(() => {
-                window.location.reload();
-            }, 500);
+        // Trigger refresh if pulled far enough and at the top
+        if (touchDiff > 80 && isContentAtTop()) {
+            performRefresh();
         } else {
+            // Reset pull-to-refresh indicator
             pullRefresh.style.transform = 'translateY(0)';
             pullRefresh.style.opacity = '0';
         }
         touchStart = 0;
         touchDiff = 0;
     });
+
+    // Also allow refresh on document/body for better mobile support
+    document.addEventListener('touchstart', (e) => {
+        if (contentArea.scrollTop <= 0 && e.target === contentArea) {
+            touchStart = e.touches[0].clientY;
+        }
+    }, { passive: true });
 }
 
 /* ============================================================
@@ -295,17 +322,24 @@ if ('serviceWorker' in navigator) {
 
 // Global initialization
 document.addEventListener('DOMContentLoaded', () => {
-    // Restore previous page state
-    const savedPage = localStorage.getItem('adex_active_page') || 'home';
-    setActivePage(savedPage, true);
+    // Restore previous page state with a small delay to ensure DOM is ready
+    setTimeout(() => {
+        const savedPage = localStorage.getItem('adex_active_page') || 'home';
+        setActivePage(savedPage, true);
 
-    const savedProfileTab = localStorage.getItem('adex_active_profile_tab');
-    if (savedProfileTab) {
-        const tabEl = document.querySelector(`.profile-tab[data-tab="${savedProfileTab}"]`);
-        if (tabEl) tabEl.click();
-    }
+        const savedProfileTab = localStorage.getItem('adex_active_profile_tab');
+        if (savedProfileTab) {
+            const tabEl = document.querySelector(`.profile-tab[data-tab="${savedProfileTab}"]`);
+            if (tabEl) tabEl.click();
+        }
 
-    applyProfile();
-    initInventorySync();
-    initChatSync();
+        applyProfile();
+        initInventorySync();
+        initChatSync();
+        
+        // Scroll to top after page restoration
+        setTimeout(() => {
+            if (contentArea) contentArea.scrollTop = 0;
+        }, 100);
+    }, 50);
 });
