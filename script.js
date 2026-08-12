@@ -144,7 +144,14 @@ function setActivePage(target, skipHistory = false) {
     pages.forEach(p => {
         p.classList.toggle('active', p.id === target);
     });
-    document.body.classList.toggle('chat-open', target === 'chat');
+
+    // Switch panels automatically when clicking Chat
+    if (target === 'chat') {
+        openChatRoom();
+        document.body.classList.add('chat-open');
+    } else {
+        document.body.classList.remove('chat-open');
+    }
 
     if (!skipHistory) {
         localStorage.setItem('adex_active_page', target);
@@ -219,48 +226,31 @@ if (contentArea && pullRefresh) {
 /* ============================================================
    CHAT ENGINE (Real-time Messaging & Notifications)
    ============================================================ */
-const scList = document.querySelector('#sc-list');
-const scRoom = document.querySelector('#sc-room');
-const scBackBtn = document.querySelector('#sc-back');
-const scSendBtn = document.querySelector('#sc-send');
-const scInput = document.querySelector('#sc-input');
-const scMessages = document.querySelector('#sc-messages');
-
-const CHAT_HISTORY_KEY = 'adex_chat_history_' + chatSessionId;
-function loadLocalChat() { return JSON.parse(localStorage.getItem(CHAT_HISTORY_KEY) || '[]'); }
-function saveLocalChat(msgs) { localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(msgs)); }
-
-function requestNotificationPermission() {
-    if ("Notification" in window) Notification.requestPermission();
-}
-
-function showWebNotification(title, body) {
-    if (Notification.permission === "granted") {
-        new Notification(title, { body: body, icon: 'icon.svg' });
-        if (window.navigator.vibrate) window.navigator.vibrate([100, 50, 100]);
-    }
-}
-
 function initChatSync() {
+    const scMessages = document.querySelector('#sc-messages');
+    if (!scMessages) return;
+
     requestNotificationPermission();
     const localMsgs = loadLocalChat();
-    if (localMsgs.length > 0 && scMessages) {
+    if (localMsgs.length > 0) {
         scMessages.innerHTML = '';
         localMsgs.forEach(m => scAppend(m.text, m.isSentByUser));
     }
 
     rtdb.ref("chats/" + chatSessionId).on("value", (snapshot) => {
         const data = snapshot.val();
-        if (data && data.messages && scMessages) {
+        const msgArea = document.querySelector('#sc-messages');
+        if (data && data.messages && msgArea) {
             const remoteMsgs = Object.values(data.messages).sort((a,b) => a.time - b.time);
             if (remoteMsgs.length > 0) {
                 const lastMsg = remoteMsgs[remoteMsgs.length - 1];
+                const localMsgs = loadLocalChat();
                 const lastLocalTime = localMsgs.length > 0 ? localMsgs[localMsgs.length - 1].time : 0;
                 if (!lastMsg.isSentByUser && lastMsg.time > lastLocalTime) {
                     showWebNotification("Adex Admin", lastMsg.text);
                 }
             }
-            scMessages.innerHTML = '';
+            msgArea.innerHTML = '';
             remoteMsgs.forEach(m => scAppend(m.text, m.isSentByUser));
             saveLocalChat(remoteMsgs);
         } else if (!data) {
@@ -272,16 +262,19 @@ function initChatSync() {
 }
 
 function scAppend(text, isOut) {
-    if (!scMessages) return;
+    const el = document.querySelector('#sc-messages');
+    if (!el) return;
     const bubble = document.createElement('div');
     bubble.className = `sc-bubble ${isOut ? 'out' : 'in'}`;
     bubble.innerHTML = `<div class="sc-bubble-text">${text}</div>`;
-    scMessages.appendChild(bubble);
-    scMessages.scrollTop = scMessages.scrollHeight;
+    el.appendChild(bubble);
+    el.scrollTop = el.scrollHeight;
 }
 
 function scSend() {
-    const text = scInput.value.trim();
+    const input = document.querySelector('#sc-input');
+    if (!input) return;
+    const text = input.value.trim();
     if (!text) return;
     const profile = loadProfile();
     if (profile.name === 'Guest User') {
@@ -292,7 +285,7 @@ function scSend() {
     const newMsg = { text, isSentByUser: true, time: Date.now() };
     rtdb.ref("chats/" + chatSessionId + "/messages").push(newMsg);
     rtdb.ref("chats/" + chatSessionId).update({ lastMessage: text, timestamp: Date.now(), userName: profile.name });
-    scInput.value = '';
+    input.value = '';
 }
 
 if (scSendBtn) scSendBtn.addEventListener('click', scSend);
@@ -307,8 +300,10 @@ function scSendInquiry(text) {
 }
 
 function openChatRoom() {
-    if (scList) scList.classList.remove('active');
-    if (scRoom) scRoom.classList.add('active');
+    const list = document.querySelector('#sc-list');
+    const room = document.querySelector('#sc-room');
+    if (list) list.classList.remove('active');
+    if (room) room.classList.add('active');
 }
 
 if (scBackBtn) {
