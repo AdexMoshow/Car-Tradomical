@@ -401,6 +401,126 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // 8. PWA Installation Handling
+    let deferredPrompt = null;
+    
+    // Capture the beforeinstallprompt event
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        const installBanner = document.querySelector('#install-banner');
+        if (installBanner) installBanner.classList.add('show');
+    });
+    
+    // Hide banner when app is installed
+    window.addEventListener('appinstalled', () => {
+        const installBanner = document.querySelector('#install-banner');
+        if (installBanner) installBanner.classList.remove('show');
+        deferredPrompt = null;
+    });
+    
+    // Profile Install Web App Button
+    const profileInstallBtn = document.querySelector('#profile-install-btn');
+    if (profileInstallBtn) {
+        profileInstallBtn.addEventListener('click', async () => {
+            if (!deferredPrompt) {
+                alert('AdexMoshow is already installed or not available for your device.\n\nSee "How to Install" for manual installation instructions.');
+                return;
+            }
+            
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            
+            if (outcome === 'accepted') {
+                alert('✅ AdexMoshow has been installed! You can find it on your home screen.');
+                const installBanner = document.querySelector('#install-banner');
+                if (installBanner) installBanner.classList.remove('show');
+            } else {
+                alert('Installation was cancelled.');
+            }
+            
+            deferredPrompt = null;
+        });
+    }
+    
+    // How to Install Guide Button
+    const profileInstallGuideBtn = document.querySelector('#profile-install-guide-btn');
+    const guideModal = document.querySelector('#install-guide-modal');
+    
+    if (profileInstallGuideBtn) {
+        profileInstallGuideBtn.addEventListener('click', () => {
+            if (guideModal) guideModal.classList.add('active');
+        });
+    }
+    
+    // Guide Modal Close Button
+    const guideCloseBtn = document.querySelector('#guide-close');
+    if (guideCloseBtn) {
+        guideCloseBtn.addEventListener('click', () => {
+            if (guideModal) guideModal.classList.remove('active');
+        });
+    }
+    
+    // Install Now Button in Guide
+    const guideInstallNowBtn = document.querySelector('#guide-install-now');
+    if (guideInstallNowBtn) {
+        guideInstallNowBtn.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                
+                if (outcome === 'accepted') {
+                    alert('✅ AdexMoshow has been installed! You can find it on your home screen.');
+                    if (guideModal) guideModal.classList.remove('active');
+                    const installBanner = document.querySelector('#install-banner');
+                    if (installBanner) installBanner.classList.remove('show');
+                }
+                deferredPrompt = null;
+            } else {
+                alert('Auto-install is not available.\n\nPlease follow the manual installation steps shown above for your device.');
+            }
+        });
+    }
+    
+    // Close guide modal when clicking outside
+    if (guideModal) {
+        guideModal.addEventListener('click', (e) => {
+            if (e.target === guideModal) {
+                guideModal.classList.remove('active');
+            }
+        });
+    }
+    
+    // Install Banner Close Button
+    const installCloseBtn = document.querySelector('#install-close');
+    if (installCloseBtn) {
+        installCloseBtn.addEventListener('click', () => {
+            const installBanner = document.querySelector('#install-banner');
+            if (installBanner) installBanner.classList.remove('show');
+            localStorage.setItem('adex_install_banner_dismissed', 'true');
+        });
+    }
+    
+    // Install Banner Get App Button
+    const installBtn = document.querySelector('#install-btn');
+    if (installBtn) {
+        installBtn.addEventListener('click', async () => {
+            if (!deferredPrompt) {
+                alert('AdexMoshow is already installed or not available for your device.');
+                return;
+            }
+            
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            
+            if (outcome === 'accepted') {
+                const installBanner = document.querySelector('#install-banner');
+                if (installBanner) installBanner.classList.remove('show');
+            }
+            deferredPrompt = null;
+        });
+    }
+
     // Start background syncs
     initInventorySync();
     initChatSync();
