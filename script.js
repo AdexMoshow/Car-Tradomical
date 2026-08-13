@@ -58,9 +58,10 @@ function setActivePage(target, skipHistory = false) {
     // Immersive chat mode
     document.body.classList.toggle('chat-open', target === 'chat');
 
-    // Auto-open chat room when entering chat page
+    // Show conversation list when entering chat page (NOT the room)
     if (target === 'chat') {
-        openChatRoom();
+        closeChatRoom();  // This ensures we show the conversation list first
+        populateConversationList();  // Populate conversations
     }
 
     if (!skipHistory) {
@@ -83,6 +84,39 @@ function closeChatRoom() {
     const room = document.querySelector('#sc-room');
     if (room) room.classList.remove('active');
     if (list) list.classList.add('active');
+}
+
+/* ============================================================
+   CONVERSATION LIST MANAGEMENT
+   ============================================================ */
+function populateConversationList() {
+    const convoList = document.querySelector('#sc-convo-list');
+    if (!convoList) return;
+    
+    // Always show the main "Adex Support" conversation
+    const convoCard = document.createElement('div');
+    convoCard.className = 'sc-convo';
+    convoCard.innerHTML = `
+        <div class="sc-avatar">
+            <img src="Adewale.jpeg" alt="Adex Support">
+            <span class="sc-avatar-dot"></span>
+        </div>
+        <div class="sc-convo-body">
+            <div class="sc-convo-head">
+                <h4 class="sc-convo-name">Adex Support</h4>
+                <span class="sc-convo-time">Now</span>
+            </div>
+            <p class="sc-convo-preview">We're here to help. Tap to chat!</p>
+        </div>
+    `;
+    
+    // Add click handler to open the chat room
+    convoCard.addEventListener('click', () => {
+        openChatRoom();
+    });
+    
+    convoList.innerHTML = '';
+    convoList.appendChild(convoCard);
 }
 
 /* ============================================================
