@@ -58,12 +58,9 @@ function setActivePage(target, skipHistory = false) {
     // Immersive chat mode
     document.body.classList.toggle('chat-open', target === 'chat');
 
-    // Support hub panel logic
+    // Auto-open chat room when entering chat page
     if (target === 'chat') {
-        const list = document.querySelector('#sc-list');
-        const room = document.querySelector('#sc-room');
-        if (list) list.classList.remove('active');
-        if (room) room.classList.add('active');
+        openChatRoom();
     }
 
     if (!skipHistory) {
@@ -72,6 +69,20 @@ function setActivePage(target, skipHistory = false) {
 
     const content = document.querySelector('#content');
     if (content) content.scrollTop = 0;
+}
+
+function openChatRoom() {
+    const list = document.querySelector('#sc-list');
+    const room = document.querySelector('#sc-room');
+    if (list) list.classList.remove('active');
+    if (room) room.classList.add('active');
+}
+
+function closeChatRoom() {
+    const list = document.querySelector('#sc-list');
+    const room = document.querySelector('#sc-room');
+    if (room) room.classList.remove('active');
+    if (list) list.classList.add('active');
 }
 
 /* ============================================================
@@ -102,17 +113,8 @@ function initInventorySync() {
 function renderInventory() {
     const carGrid = document.querySelector('.car-grid-3');
     const tradoGrid = document.querySelector('.trado-grid-3');
-    
-    if (carGrid) {
-        carGrid.innerHTML = inventory.cars.length > 0
-            ? inventory.cars.map(c => createProductCard(c, 'car')).join('')
-            : '<p class="empty-msg">No cars available.</p>';
-    }
-    if (tradoGrid) {
-        tradoGrid.innerHTML = inventory.herbs.length > 0
-            ? inventory.herbs.map(h => createProductCard(h, 'herb')).join('')
-            : '<p class="empty-msg">No herbs available.</p>';
-    }
+    if (carGrid) carGrid.innerHTML = inventory.cars.length > 0 ? inventory.cars.map(c => createProductCard(c, 'car')).join('') : '<p class="empty-msg">No cars available.</p>';
+    if (tradoGrid) tradoGrid.innerHTML = inventory.herbs.length > 0 ? inventory.herbs.map(h => createProductCard(h, 'herb')).join('') : '<p class="empty-msg">No herbs available.</p>';
 }
 
 function createProductCard(item, type) {
@@ -145,10 +147,8 @@ function initChatSync() {
     const msgArea = document.querySelector('#sc-messages');
     if (!msgArea) return;
 
-    // Permissions
     if ("Notification" in window) Notification.requestPermission();
 
-    // Local history first
     const localMsgs = loadLocalChat();
     if (localMsgs.length > 0) {
         msgArea.innerHTML = '';
@@ -159,8 +159,6 @@ function initChatSync() {
         const data = snapshot.val();
         if (data && data.messages) {
             const remoteMsgs = Object.values(data.messages).sort((a,b) => a.time - b.time);
-
-            // New message notification
             const lastMsg = remoteMsgs[remoteMsgs.length - 1];
             const localMsgs = loadLocalChat();
             const lastLocalTime = localMsgs.length > 0 ? localMsgs[localMsgs.length - 1].time : 0;
@@ -170,12 +168,10 @@ function initChatSync() {
                     if (window.navigator.vibrate) window.navigator.vibrate([100, 50, 100]);
                 }
             }
-
             msgArea.innerHTML = '';
             remoteMsgs.forEach(m => scAppend(m.text, m.isSentByUser));
             saveLocalChat(remoteMsgs);
         } else if (!data) {
-            // Seed initial message
             const initialMsg = { text: 'Hello! 👋 How can I help you today?', isSentByUser: false, time: Date.now() };
             rtdb.ref("chats/" + chatSessionId).set({ id: chatSessionId, userName: loadProfile().name, timestamp: Date.now() });
             rtdb.ref("chats/" + chatSessionId + "/messages").push(initialMsg);
@@ -219,31 +215,13 @@ function scSendInquiry(text) {
 }
 
 /* ============================================================
-   PWA & INSTALL
-   ============================================================ */
-let deferredPrompt = null;
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    document.querySelector('#install-banner')?.classList.add('show');
-});
-
-async function triggerInstall() {
-    if (!deferredPrompt) return alert('Installation not available. Use your browser menu "Add to Home Screen".');
-    deferredPrompt.prompt();
-    deferredPrompt = null;
-    document.querySelector('#install-banner')?.classList.remove('show');
-}
-
-/* ============================================================
    GLOBAL EVENT LISTENERS
    ============================================================ */
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Navigation Restorer
+    // 1. App Startup
     const savedPage = localStorage.getItem('adex_active_page') || 'home';
     setActivePage(savedPage, true);
 
-    // 2. Profile Initializer
     const applyProfile = () => {
         const p = loadProfile();
         const isGuest = p.name === 'Guest User';
@@ -256,7 +234,30 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     applyProfile();
 
-    // 3. Set Username Handler
+    // 2. Navigation Tabs
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', () => setActivePage(item.getAttribute('data-target')));
+    });
+
+    document.querySelectorAll('.profile-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const target = tab.getAttribute('data-tab');
+            document.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === `tab-${target}`));
+        });
+    });
+
+    // 3. Chat Controls
+    const scSendBtn = document.querySelector('#sc-send');
+    const scInput = document.querySelector('#sc-input');
+    const scBackBtn = document.querySelector('#sc-back');
+
+    if (scSendBtn) scSendBtn.addEventListener('click', scSend);
+    if (scInput) scInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') scSend(); });
+    if (scBackBtn) scBackBtn.addEventListener('click', closeChatRoom);
+
+    // 4. Set Username Handler
     const setBtn = document.querySelector('#set-username-btn');
     if (setBtn) {
         setBtn.addEventListener('click', async () => {
@@ -280,7 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 4. Logout Handler
+    // 5. Logout Handler
     document.querySelector('.logout-btn')?.addEventListener('click', async () => {
         if (!confirm('Sign out?')) return;
         await auth.signOut();
@@ -288,31 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.reload();
     });
 
-    // 5. PWA Handlers
-    document.querySelector('#install-btn')?.addEventListener('click', triggerInstall);
-    document.querySelector('#profile-install-btn')?.addEventListener('click', triggerInstall);
-    document.querySelector('#install-close')?.addEventListener('click', () => document.querySelector('#install-banner')?.classList.remove('show'));
-
-    const guideModal = document.querySelector('#install-guide-modal');
-    document.querySelector('#profile-install-guide-btn')?.addEventListener('click', () => guideModal?.classList.add('active'));
-    document.querySelector('#guide-close')?.addEventListener('click', () => guideModal?.classList.remove('active'));
-    document.querySelector('#guide-install-now')?.addEventListener('click', triggerInstall);
-
-    // 6. Navigation Tabs
-    document.querySelectorAll('.nav-item').forEach(item => {
-        item.addEventListener('click', () => setActivePage(item.getAttribute('data-target')));
-    });
-
-    document.querySelectorAll('.profile-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            const target = tab.getAttribute('data-tab');
-            document.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === `tab-${target}`));
-        });
-    });
-
-    // 7. Product Details
+    // 6. Product Details & Inquiry Buttons
     document.addEventListener('click', (e) => {
         const product = e.target.closest('.clickable-product');
         if (product) {
@@ -337,7 +314,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Chat buttons in detail overlay
         const chatBtn = e.target.closest('.detail-actions .secondary-action');
         const reserveBtn = e.target.closest('#reserve-btn');
         if (chatBtn || reserveBtn) {
@@ -360,6 +336,36 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector('#product-detail-overlay').classList.remove('active');
         document.body.style.overflow = '';
     });
+
+    // 7. PWA / Pull-to-Refresh (Optional but good)
+    const contentArea = document.querySelector('#content');
+    const pullRefresh = document.querySelector('#pull-to-refresh');
+    let touchStart = 0, touchDiff = 0;
+    if (contentArea && pullRefresh) {
+        contentArea.addEventListener('touchstart', (e) => { if (contentArea.scrollTop <= 0) touchStart = e.touches[0].clientY; else touchStart = 0; }, { passive: true });
+        contentArea.addEventListener('touchmove', (e) => {
+            if (touchStart > 0 && contentArea.scrollTop <= 0) {
+                const currentTouch = e.touches[0].clientY;
+                touchDiff = (currentTouch - touchStart) * 0.5;
+                if (touchDiff > 0) {
+                    if (touchDiff > 120) touchDiff = 120 + (touchDiff - 120) * 0.2;
+                    pullRefresh.style.transform = `translateY(${touchDiff}px)`;
+                    pullRefresh.style.opacity = Math.min(touchDiff / 80, 1);
+                }
+            }
+        }, { passive: true });
+        contentArea.addEventListener('touchend', () => {
+            if (touchDiff > 80 && contentArea.scrollTop <= 0) {
+                pullRefresh.style.transform = 'translateY(60px)';
+                if (window.navigator.vibrate) window.navigator.vibrate(20);
+                setTimeout(() => window.location.reload(), 500);
+            } else {
+                pullRefresh.style.transform = 'translateY(0)';
+                pullRefresh.style.opacity = '0';
+            }
+            touchStart = 0; touchDiff = 0;
+        });
+    }
 
     // Start background syncs
     initInventorySync();
